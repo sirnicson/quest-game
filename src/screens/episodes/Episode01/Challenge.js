@@ -53,7 +53,7 @@ function listeningCard(stop, game, player, retry) {
   const status = state.status;
   const locked = status === 'correct' || status === 'incorrect';
   const fieldState = locked ? status : '';
-  const feedback = state.message ? `<p class="listening-feedback ${status}" role="status">${escapeHtml(state.message)}</p>` : '';
+  const feedback = state.message && status !== 'correct' && status !== 'incorrect' ? `<p class="listening-feedback ${status}" role="status">${escapeHtml(state.message)}</p>` : '';
   const playLabel = state.played ? '▶ REPLAY' : '▶ PLAY AUDIO';
   const { online, owner } = role(game);
   const watching = online && !owner;
@@ -87,7 +87,7 @@ function readingCard(stop, game, player, retry) {
     if (state.status === 'incorrect') return 'selected wrong';
     return 'selected';
   };
-  const feedback = state.message && !(isQuiz && state.status === 'correct') ? `<p class="reading-feedback ${state.status}" role="status">${escapeHtml(state.message)}</p>` : '';
+  const feedback = state.message && state.status !== 'correct' && state.status !== 'incorrect' ? `<p class="reading-feedback ${state.status}" role="status">${escapeHtml(state.message)}</p>` : '';
   const victim = game.players[OTHER[game.activePlayer || 'student']];
   const available = isQuiz && state.choosing ? punishOptions(game) : [];
   const spent = rewardsUsed(game, game.activePlayer || 'student');

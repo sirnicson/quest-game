@@ -182,17 +182,30 @@ export function createApp(root) {
       previewTimer = null;
       previewKey = nextPreviewKey;
       if (nextPreviewKey) {
+        const moving = Boolean(game.moveAnim || game.backAnim);
+        const moveDuration = Math.max(
+          game.moveAnim ? (game.moveAnim.to - game.moveAnim.from) * MOVE_MS : 0,
+          game.backAnim ? BACK_MS : 0
+        );
+        const previewDuration = game.notice ? 3800 : 1600;
         previewTimer = setTimeout(() => {
           if (game.screen !== 'challenge' || !game.playerPreview) return;
           const currentKey = `${game.activePlayer}:${game.players[game.activePlayer]?.position}`;
           if (currentKey !== nextPreviewKey) return;
+          if (game.moveAnim || game.backAnim) {
+            game = { ...game, moveAnim: null, backAnim: null };
+            previewKey = null;
+            previewTimer = null;
+            render();
+            return;
+          }
           const nextStop = Math.min(14, game.players[game.activePlayer].position);
           game = { ...game, playerPreview: false, moveAnim: null, backAnim: null, camera: `stop:${nextStop}` };
           previewKey = null;
           previewTimer = null;
           render();
           animateMapTo(game.camera);
-        }, Math.max(game.moveAnim ? (game.moveAnim.to - game.moveAnim.from) * MOVE_MS + 500 : game.backAnim ? BACK_MS + 600 : 1600, game.notice ? 3800 : 0));
+        }, moving ? moveDuration + 500 : previewDuration);
       }
     }
     const gameScreen=['map','challenge','result','report'].includes(game.screen);
