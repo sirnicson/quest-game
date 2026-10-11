@@ -440,6 +440,19 @@ animation:forest-light 11s ease-in-out infinite alternate}
 
 .quiz-photo{display:block;width:100%;height:clamp(70px,17vh,160px);object-fit:cover;border-radius:12px;margin:0 0 10px;flex:0 0 auto;box-shadow:0 3px 10px #0003}
 
+/* Photo Quiz cards: question and image share the upper row; actions sit below, left aligned. */
+.gameplay-map .challenge-overlay .challenge-card.quiz-photo-card{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:0}
+.gameplay-map .challenge-overlay .quiz-photo-card>.challenge-top{grid-column:1/-1}
+.gameplay-map .challenge-overlay .quiz-photo-content{display:grid;grid-template-columns:minmax(0,2fr) minmax(78px,1fr);gap:clamp(8px,1vw,14px);align-items:center;min-height:0}
+.gameplay-map .challenge-overlay .quiz-question-content{display:flex;flex-direction:column;min-width:0;min-height:0}
+.gameplay-map .challenge-overlay .quiz-photo-card .quiz-photo{width:100%;height:auto;aspect-ratio:1;max-height:min(32vh,210px);object-fit:cover;margin:0;border-radius:12px;align-self:center}
+.gameplay-map .challenge-overlay .quiz-photo-card .prompt{margin-top:2px}
+.gameplay-map .challenge-overlay .quiz-photo-card .quiz-photo-actions{grid-column:1/-1;margin-top:clamp(8px,1.2vh,14px);text-align:left}
+.gameplay-map .challenge-overlay .quiz-photo-actions .teacher-tools{width:100%;justify-content:flex-start}
+.gameplay-map .challenge-overlay .quiz-photo-actions .reward-title{text-align:left;margin:0 0 8px}
+.gameplay-map .challenge-overlay .quiz-photo-actions .quiz-punish{width:min(100%,360px)}
+@media(max-width:600px){.gameplay-map .challenge-overlay .challenge-card.quiz-photo-card{grid-template-rows:auto minmax(0,1fr) auto}.gameplay-map .challenge-overlay .quiz-photo-content{grid-template-columns:minmax(0,2fr) minmax(74px,1fr);gap:8px}}
+
 .reward-title{margin:12px 0 8px;font-size:10px;font-weight:900;letter-spacing:.22em;color:#7a6a3a;text-align:center}
 .quiz-punish{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
 .reward-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border:1px solid #c79a2e55;border-radius:14px;background:#fffaf0;color:#223027;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}

@@ -76,6 +76,7 @@ const quizCard = (stop, game, player, retry) => readingCard(stop, game, player, 
 
 function readingCard(stop, game, player, retry) {
   const isQuiz = stop.lane === 'Quiz';
+  const photoQuiz = isQuiz && Boolean(stop.image);
   const state = game.quiz ?? {};
   const { online, owner } = role(game);
   const locked = state.status === 'correct' || state.status === 'incorrect' || (online && !owner);
@@ -102,15 +103,24 @@ function readingCard(stop, game, player, retry) {
     <div class="quiz-punish">${punishBtn('freeze', 'FREEZE')}${punishBtn('back', 'GO BACK')}${punishBtn('boost', 'BOOST')}</div>`)
     : online && !owner
       ? (state.status === 'correct' || state.status === 'incorrect' ? '' : `<p class="judge-note">${escapeHtml(player.name)} is answering…</p>`)
-      : `<div class="teacher-tools"><span>${locked ? '' : 'Select an answer, then check it.'}</span>${button('CHECK ANSWER','check-reading','success').replace('class="btn', `${locked || selected === null ? 'disabled ' : ''}class="btn`)}</div>`;
-  return `<aside class="challenge-card long-question reading-question ${isQuiz ? 'quiz-mcq ' : ''}${state.status ?? ''}">
+      : `<div class="teacher-tools">${button('CHECK ANSWER','check-reading','success').replace('class="btn', `${locked || selected === null ? 'disabled ' : ''}class="btn`)}</div>`;
+  const quizContent = `<div class="quiz-photo-content">
+    <div class="quiz-question-content">
+      <p class="prompt">${escapeHtml(stop.prompt)}</p>
+      <div class="options" role="group" aria-label="Answer options">${stop.options.map((o, i) => `<button type="button" class="option ${optionClass(i)}" data-answer="${i}" ${locked ? 'disabled' : ''}><b>${String.fromCharCode(65 + i)}</b>${escapeHtml(o)}</button>`).join('')}</div>
+      ${feedback}
+    </div>
+    <img class="quiz-photo" src="${escapeHtml(stop.image)}" alt="" loading="lazy" onerror="this.remove()">
+  </div>
+  <div class="quiz-photo-actions">${footer}</div>`;
+  return `<aside class="challenge-card long-question reading-question ${isQuiz ? 'quiz-mcq ' : ''}${photoQuiz ? 'quiz-photo-card ' : ''}${state.status ?? ''}">
     ${header(stop, game, player, retry)}
     ${isQuiz ? '' : `<p class="reading-passage">${escapeHtml(stop.passage)}</p>`}
-    ${isQuiz && stop.image ? `<img class="quiz-photo" src="${escapeHtml(stop.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+    ${photoQuiz ? quizContent : `
     <p class="prompt">${escapeHtml(stop.prompt)}</p>
     <div class="options" role="group" aria-label="Answer options">${stop.options.map((o, i) => `<button type="button" class="option ${optionClass(i)}" data-answer="${i}" ${locked ? 'disabled' : ''}><b>${String.fromCharCode(65 + i)}</b>${escapeHtml(o)}</button>`).join('')}</div>
     ${feedback}
-    ${footer}
+    ${footer}`}
   </aside>`;
 }
 
