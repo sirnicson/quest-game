@@ -276,3 +276,10 @@ test('a player sent back onto a Quiz stop gets a skill question there, not a Qui
   const shown = currentChallenge({ ...back, activePlayer: 'guide' });
   assert.notEqual(shown.lane, 'Quiz');
 });
+test('quiz pictures, when set, exist on disk', async () => {
+  const { existsSync } = await import('node:fs');
+  const { quizBank } = await import('../src/data/quizBank.js');
+  const withPic = quizBank.filter(q => q.image);
+  assert.ok(withPic.length >= 10);
+  for (const q of withPic) assert.ok(existsSync(new URL(`../${q.image}`, import.meta.url)), q.id);
+});

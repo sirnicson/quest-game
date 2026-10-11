@@ -1,9 +1,13 @@
 // Central General Knowledge Quiz bank. Any episode can draw from it; it is separate from the episode question banks.
 // Each row: id, topic, question, [correct answer, ...wrong options], extra accepted spoken/typed forms.
+// Ids that have a picture in assets/quiz/ (see CREDITS.md there).
+const PICTURES = new Set(['QZ02', 'QZ06', 'QZ07', 'QZ12', 'QZ14', 'QZ18', 'QZ20', 'QZ22', 'QZ25', 'QZ27', 'QZ29']);
+
 const row = (id, topic, prompt, options, extra = []) => ({
   id,
   level: 'General',
   topic,
+  image: PICTURES.has(id) ? `assets/quiz/${id}.jpg` : null,
   prompt,
   answer: options[0],
   options,

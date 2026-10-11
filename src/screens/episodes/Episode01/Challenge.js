@@ -105,6 +105,7 @@ function readingCard(stop, game, player, retry) {
   return `<aside class="challenge-card long-question reading-question ${isQuiz ? 'quiz-mcq ' : ''}${state.status ?? ''}">
     ${header(stop, game, player, retry)}
     ${isQuiz ? '' : `<p class="reading-passage">${escapeHtml(stop.passage)}</p>`}
+    ${isQuiz && stop.image ? `<img class="quiz-photo" src="${escapeHtml(stop.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
     <p class="prompt">${escapeHtml(stop.prompt)}</p>
     <div class="options" role="group" aria-label="Answer options">${stop.options.map((o, i) => `<button type="button" class="option ${optionClass(i)}" data-answer="${i}" ${locked ? 'disabled' : ''}><b>${String.fromCharCode(65 + i)}</b>${escapeHtml(o)}</button>`).join('')}</div>
     ${feedback}
