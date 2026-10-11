@@ -93,8 +93,8 @@
 
 ## Completion checklist
 
-- Confirm every spec acceptance criterion is covered by the changed data, checker, UI, and action state.
-- Review `git diff` to ensure only the six scoped Listening files changed, aside from this plan.
-- Leave audio assets and all non-Listening challenge behavior untouched.
+- [x] Confirm every spec acceptance criterion is represented in the changed data, checker, UI, and action state; runtime behavior remains unverified as noted above.
+- [x] Review `git diff` to ensure only the eight scoped Listening implementation/support files changed, aside from this plan.
+- [x] Leave audio assets and all non-Listening challenge behavior untouched.
 
 Runtime QA note: The local server started on port 5174, but browser discovery returned “No browser is available.” The local answer-flow and online two-player walkthroughs remain unverified.
