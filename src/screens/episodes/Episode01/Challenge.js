@@ -86,19 +86,20 @@ function readingCard(stop, game, player, retry) {
     if (state.status === 'incorrect') return 'selected wrong';
     return 'selected';
   };
-  const feedback = state.message ? `<p class="reading-feedback ${state.status}" role="status">${escapeHtml(state.message)}</p>` : '';
+  const feedback = state.message && !(isQuiz && state.status === 'correct') ? `<p class="reading-feedback ${state.status}" role="status">${escapeHtml(state.message)}</p>` : '';
   const victim = game.players[OTHER[game.activePlayer || 'student']];
   const available = isQuiz && state.choosing ? punishOptions(game) : [];
   const spent = rewardsUsed(game, game.activePlayer || 'student');
-  const punishBtn = (kind, label) => `<button type="button" class="btn primary ${spent.includes(kind) ? 'spent' : ''}" data-action="quiz-punish" data-points="${kind}" ${available.includes(kind) ? '' : 'disabled'}>${label}</button>`;
+  const REWARD_ICON = { freeze: '\u2744', back: '\u23EA', boost: '\u{1F680}' };
+  const punishBtn = (kind, label) => `<button type="button" class="reward-tile ${spent.includes(kind) ? 'spent' : ''}" data-action="quiz-punish" data-points="${kind}" ${available.includes(kind) ? '' : 'disabled'}><i>${REWARD_ICON[kind]}</i><b>${label}</b>${spent.includes(kind) ? '<small>USED</small>' : ''}</button>`;
   const chosenLabel = PUNISH_LABELS[state.chosen];
   const footer = isQuiz && state.chosen
     ? `<p class="judge-note quiz-verdict"><b>${chosenLabel}</b></p>`
     : isQuiz && state.choosing
     ? (online && !owner
       ? `<p class="judge-note">${escapeHtml(player.name)} is choosing…</p>`
-      : `<p class="judge-note">Choose a reward (Each can be used once)</p>
-    <div class="teacher-tools quiz-punish">${punishBtn('freeze', '❄ FREEZE')}${punishBtn('back', '⏪ GO BACK')}${punishBtn('boost', '🚀 BOOST')}</div>`)
+      : `<p class="reward-title">CHOOSE YOUR REWARD</p>
+    <div class="quiz-punish">${punishBtn('freeze', 'FREEZE')}${punishBtn('back', 'GO BACK')}${punishBtn('boost', 'BOOST')}</div>`)
     : online && !owner
       ? (state.status === 'correct' || state.status === 'incorrect' ? '' : `<p class="judge-note">${escapeHtml(player.name)} is answering…</p>`)
       : `<div class="teacher-tools"><span>${locked ? '' : 'Select an answer, then check it.'}</span>${button('CHECK ANSWER','check-reading','success').replace('class="btn', `${locked || selected === null ? 'disabled ' : ''}class="btn`)}</div>`;

@@ -439,3 +439,12 @@ animation:forest-light 11s ease-in-out infinite alternate}
 @keyframes unreveal-journey-dots{to{stroke-dashoffset:100}}
 
 .quiz-photo{display:block;width:100%;height:clamp(70px,17vh,160px);object-fit:cover;border-radius:12px;margin:0 0 10px;flex:0 0 auto;box-shadow:0 3px 10px #0003}
+
+.reward-title{margin:12px 0 8px;font-size:10px;font-weight:900;letter-spacing:.22em;color:#7a6a3a;text-align:center}
+.quiz-punish{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
+.reward-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border:1px solid #c79a2e55;border-radius:14px;background:#fffaf0;color:#223027;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}
+.reward-tile i{font-style:normal;font-size:20px;line-height:1}
+.reward-tile b{font-size:10px;letter-spacing:.12em}
+.reward-tile small{font-size:8px;letter-spacing:.16em;color:#8a8f86}
+.reward-tile:hover:not(:disabled){transform:translateY(-2px);background:#fff;box-shadow:0 6px 14px #0002;border-color:#c79a2e}
+.reward-tile:disabled{cursor:default;opacity:.4;filter:grayscale(1)}
