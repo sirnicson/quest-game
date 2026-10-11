@@ -283,3 +283,9 @@ test('quiz pictures, when set, exist on disk', async () => {
   assert.ok(withPic.length >= 10);
   for (const q of withPic) assert.ok(existsSync(new URL(`../${q.image}`, import.meta.url)), q.id);
 });
+test('only Quiz challenges carry a picture', () => {
+  for (const lane of Object.keys(bankIds)) {
+    if (lane === 'Quiz') continue;
+    for (const id of bankIds[lane]) assert.equal(challengeById(id).image ?? null, null, `${lane} ${id}`);
+  }
+});
