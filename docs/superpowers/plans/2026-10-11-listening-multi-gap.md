@@ -64,20 +64,25 @@
 
 **Files:**
 - Modify: `src/App.js`
+- Modify: `scripts/rooms.mjs`
 
 **Interfaces:**
 - `game.listening` stores `{ played: boolean, values: string[], gapStatuses: string[], status: string, message: string }`.
-- `check-listening` multiplayer action `v` carries a JSON-serializable `string[]` in prompt order.
+- `check-listening` multiplayer action `v` carries up to three strings in prompt order; the room server forwards up to three strings, each capped at 40 characters.
 
-- [ ] Update `markListeningPlayed` to preserve all values from `[data-listening-gap]` inputs and focus the first gap after rerender.
-- [ ] Update action broadcasting and remote action handling to collect and pass the ordered values array.
-- [ ] Update `check-listening` to validate the full array, save per-gap state, focus the first retryable gap for empty/over-limit results, and finish the turn once for complete correct/incorrect results.
-- [ ] Update Enter handling so Enter in any Listening gap checks the answer set.
+- [x] Update `markListeningPlayed` to preserve all values from `[data-listening-gap]` inputs and focus the first gap after rerender.
+- [x] Update action broadcasting and remote action handling to collect and pass the ordered values array.
+- [x] Update `check-listening` to validate the full array, save per-gap state, focus the first retryable gap for empty/over-limit results, and finish the turn once for complete correct/incorrect results.
+- [x] Update Enter handling so Enter in any Listening gap checks the answer set.
 - [ ] Manually walk through LS01 and LS05 locally: correct all gaps, submit one incorrect gap, and leave a gap empty; confirm score/turn behavior matches the spec.
 - [ ] Manually walk through one online two-player Listening item and confirm both clients show matching per-gap values/status and finish the turn only after the active player’s response.
+
+**Ruling:** Include `scripts/rooms.mjs` in Task 3 because the room server currently drops all non-string action values; for `check-listening` only, forward at most three strings capped at 40 characters each. This is required for multiplayer gap arrays; if the limit is wrong, longer future Listening prompts could be truncated.
 
 ## Completion checklist
 
 - Confirm every spec acceptance criterion is covered by the changed data, checker, UI, and action state.
-- Review `git diff` to ensure only the five scoped Listening files changed, aside from this plan.
+- Review `git diff` to ensure only the six scoped Listening files changed, aside from this plan.
 - Leave audio assets and all non-Listening challenge behavior untouched.
+
+Runtime QA note: The local server started on port 5174, but browser discovery returned “No browser is available.” The local answer-flow and online two-player walkthroughs remain unverified.

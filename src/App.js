@@ -110,13 +110,14 @@ export function createApp(root) {
     });
   }
 
-  // Audio that finishes (or cannot load) unlocks the answer field, keeping any text already typed.
+  // Audio that finishes (or cannot load) unlocks every gap, keeping text already entered.
   function markListeningPlayed(){
     if(game.screen!=='challenge' || game.listening?.played) return;
-    const input=root.querySelector('#listening-answer');
-    game={...game,listening:{...game.listening,played:true,value:input?.value ?? ''}};
+    const inputs=Array.from(root.querySelectorAll('[data-listening-gap]'));
+    const values=inputs.length ? inputs.map(input=>input.value) : (game.listening?.values ?? []);
+    game={...game,listening:{...game.listening,played:true,values}};
     render();
-    root.querySelector('#listening-answer')?.focus();
+    root.querySelector('[data-listening-gap="0"]')?.focus();
   }
 
   function formatTime(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
@@ -353,7 +354,7 @@ export function createApp(root) {
     if(net && SYNCED.has(actionName) && !remote){
       const owner=game.activePlayer===net.seat;
       if(JUDGE_ACTIONS.has(actionName)===owner) return;
-      if(actionName==='check-listening') extra=root.querySelector('#listening-answer')?.value ?? '';
+      if(actionName==='check-listening') extra=Array.from(root.querySelectorAll('[data-listening-gap]'),input=>input.value);
       if(actionName==='submit-writing') extra=root.querySelector('#writing-text')?.value ?? game.writing?.value ?? '';
       sendAct(session,{a:actionName,s:stopId ?? null,v:extra ?? null});
     }
@@ -482,14 +483,18 @@ export function createApp(root) {
     }
     if(actionName==='check-listening'){
       const challenge=currentChallenge(game);
-      const input=root.querySelector('#listening-answer');
-      if(!challenge?.listening || (!input && extra===undefined) || game.listening?.status==='correct' || game.listening?.status==='incorrect') return;
-      const value=extra ?? input.value;
-      const result=checkListeningAnswer(challenge.listening,value);
-      game={...game,listening:{played:true,value,status:result.status,message:result.message}};
+      const inputs=Array.from(root.querySelectorAll('[data-listening-gap]'));
+      if(!challenge?.listening || (!inputs.length && extra===undefined) || game.listening?.status==='correct' || game.listening?.status==='incorrect') return;
+      const values=extra ?? inputs.map(input=>input.value);
+      const result=checkListeningAnswer(challenge.listening,values);
+      game={...game,listening:{played:true,values:result.values,gapStatuses:result.gapStatuses,status:result.status,message:result.message}};
       const finished=result.status==='correct' || result.status==='incorrect';
       render();
-      if(!finished){root.querySelector('#listening-answer')?.focus();return;}
+      if(!finished){
+        const retryIndex=result.gapStatuses.findIndex(gapStatus=>gapStatus==='empty' || gapStatus==='over-limit');
+        root.querySelector(`[data-listening-gap="${Math.max(0,retryIndex)}"]`)?.focus();
+        return;
+      }
       finishTurn(result.status==='correct'?LISTENING_POINTS:0);
       return;
     }
@@ -529,7 +534,7 @@ export function createApp(root) {
     }
   });
   root.addEventListener('keydown', event => {
-    if(event.key==='Enter' && event.target.id==='listening-answer'){event.preventDefault();dispatch('check-listening');return;}
+    if(event.key==='Enter' && event.target.matches?.('[data-listening-gap]')){event.preventDefault();dispatch('check-listening');return;}
     const target=event.target.closest('[data-action="stop"],[data-action="start-challenge"]');
     if(!target || !['Enter',' '].includes(event.key)) return;
     event.preventDefault(); dispatch(target.dataset.action,target.dataset.stop);
