@@ -59,7 +59,7 @@ function listeningCard(stop, game, player, retry) {
     const value = state.values?.[index] ?? '';
     const gapStatus = state.gapStatuses?.[index] ?? '';
     const answerLength = Math.max(5, Math.min(20, Math.max(...gap.accepted.map(answer => answer.length))));
-    return `${escapeHtml(part)}<input id="listening-answer-${index}" class="listening-answer ${gapStatus}" type="text" data-listening-gap="${index}" data-gap="${index + 1}" style="--gap-chars:${answerLength}" autocomplete="off" spellcheck="false" maxlength="40" aria-label="Answer ${index + 1}" value="${escapeHtml(value)}" ${state.played && !locked ? '' : 'disabled'}>`;
+    return `${escapeHtml(part)}<input id="listening-answer-${index}" class="listening-answer ${gapStatus}" type="text" data-listening-gap="${index}" data-gap="${index + 1}" size="${answerLength}" autocomplete="off" spellcheck="false" maxlength="40" aria-label="Answer ${index + 1}" value="${escapeHtml(value)}" ${state.played && !locked ? '' : 'disabled'}>`;
   }).join('') + escapeHtml(stop.listening.promptParts.at(-1) ?? '');
   const { online, owner } = role(game);
   const watching = online && !owner;
@@ -69,7 +69,7 @@ function listeningCard(stop, game, player, retry) {
     <div class="listening-player">
       <audio id="listening-audio" preload="auto" src="/${escapeHtml(stop.listening.audio)}"></audio>
       ${watching ? '' : `<button type="button" class="btn primary" data-action="play-listening" ${locked ? 'disabled' : ''}>${playLabel}</button>`}
-      <span class="listening-hint">${watching ? `${escapeHtml(player.name)} is listening…` : state.played ? 'Type your answer.' : 'Play the audio first.'}</span>
+      <span class="listening-hint">${watching ? `${escapeHtml(player.name)} is listening…` : state.played ? 'Type an answer in each blank.' : 'Play the audio first.'}</span>
     </div>
     ${feedback}
     ${watching ? '' : `<div class="teacher-tools"><span>${locked ? '' : 'Missing word(s) only.'}</span>${button('CHECK ANSWER','check-listening','success').replace('class="btn', `${state.played && !locked ? '' : 'disabled '}class="btn`)}</div>`}
