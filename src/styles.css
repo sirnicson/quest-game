@@ -336,7 +336,7 @@ animation:forest-light 11s ease-in-out infinite alternate}
 /* Listening engine */
 .listening-player{display:flex;align-items:center;gap:14px;margin:4px 0 12px}
 .listening-hint{font-size:13px;font-weight:700;color:#3c4a3f}
-.listening-answer{width:100%;box-sizing:border-box;padding:13px 15px;border:3px solid #6f5a3d;border-radius:10px;background:#fffaf0;color:#1b211c;font:700 22px Georgia,serif;transition:background .2s,border-color .2s,color .2s}
+.listening-prompt .listening-answer{display:inline-block;vertical-align:baseline;width:calc(var(--gap-chars, 8)*.62em + .8em);max-width:min(38vw,12em);min-width:3.4em;box-sizing:border-box;margin:0 .12em;padding:.12em .32em;border:2px solid #6f5a3d;border-radius:8px;background:#fffaf0;color:#1b211c;font:700 .88em Georgia,serif;transition:background .2s,border-color .2s,color .2s}
 .listening-answer:disabled{opacity:.6}
 .listening-answer.correct{background:#2f9e5e;border-color:#1c6e3f;color:#fff;opacity:1}
 .listening-answer.incorrect{background:#d8473f;border-color:#9c2923;color:#fff;opacity:1}
@@ -346,7 +346,7 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .teacher-tools button[disabled]{opacity:.45;cursor:not-allowed}
 .challenge-overlay .challenge-card.listening-question .prompt{font-size:clamp(18px,1.6vw,22px);line-height:1.22;margin:6px 0 8px}
 .challenge-overlay .challenge-card.listening-question .listening-player{margin:0 0 8px}
-.challenge-overlay .challenge-card.listening-question .listening-answer{padding:8px 12px;font-size:19px}
+.challenge-overlay .challenge-card.listening-question .listening-prompt .listening-answer{padding:.1em .28em;font-size:.86em}
 .challenge-overlay .challenge-card.listening-question .listening-feedback{margin:5px 0 0;font-size:13px}
 .challenge-overlay .challenge-card.listening-question .teacher-tools{margin-top:6px}
 

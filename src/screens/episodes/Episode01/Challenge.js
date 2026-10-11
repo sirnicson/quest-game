@@ -52,20 +52,25 @@ function listeningCard(stop, game, player, retry) {
   const state = game.listening ?? {};
   const status = state.status;
   const locked = status === 'correct' || status === 'incorrect';
-  const fieldState = locked ? status : '';
   const feedback = state.message && status !== 'correct' && status !== 'incorrect' ? `<p class="listening-feedback ${status}" role="status">${escapeHtml(state.message)}</p>` : '';
   const playLabel = state.played ? '▶ REPLAY' : '▶ PLAY AUDIO';
+  const prompt = stop.listening.gaps.map((gap, index) => {
+    const part = stop.listening.promptParts[index] ?? '';
+    const value = state.values?.[index] ?? '';
+    const gapStatus = state.gapStatuses?.[index] ?? '';
+    const answerLength = Math.max(5, Math.min(20, Math.max(...gap.accepted.map(answer => answer.length))));
+    return `${escapeHtml(part)}<input id="listening-answer-${index}" class="listening-answer ${gapStatus}" type="text" data-listening-gap="${index}" data-gap="${index + 1}" style="--gap-chars:${answerLength}" autocomplete="off" spellcheck="false" maxlength="40" aria-label="Answer ${index + 1}" value="${escapeHtml(value)}" ${state.played && !locked ? '' : 'disabled'}>`;
+  }).join('') + escapeHtml(stop.listening.promptParts.at(-1) ?? '');
   const { online, owner } = role(game);
   const watching = online && !owner;
   return `<aside class="challenge-card long-question listening-question">
     ${header(stop, game, player, retry)}
-    <p class="prompt">${escapeHtml(stop.prompt)}</p>
+    <p class="prompt listening-prompt">${prompt}</p>
     <div class="listening-player">
       <audio id="listening-audio" preload="auto" src="/${escapeHtml(stop.listening.audio)}"></audio>
       ${watching ? '' : `<button type="button" class="btn primary" data-action="play-listening" ${locked ? 'disabled' : ''}>${playLabel}</button>`}
       <span class="listening-hint">${watching ? `${escapeHtml(player.name)} is listening…` : state.played ? 'Type your answer.' : 'Play the audio first.'}</span>
     </div>
-    ${watching ? '' : `<input id="listening-answer" class="listening-answer ${fieldState}" type="text" autocomplete="off" spellcheck="false" maxlength="40" placeholder="Your answer" aria-label="Your answer" value="${escapeHtml(state.value ?? '')}" ${state.played && !locked ? '' : 'disabled'}>`}
     ${feedback}
     ${watching ? '' : `<div class="teacher-tools"><span>${locked ? '' : 'Missing word(s) only.'}</span>${button('CHECK ANSWER','check-listening','success').replace('class="btn', `${state.played && !locked ? '' : 'disabled '}class="btn`)}</div>`}
   </aside>`;

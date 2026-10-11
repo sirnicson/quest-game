@@ -55,10 +55,10 @@
 - The Listening card reads `state.values: string[]` and `state.gapStatuses: string[]`.
 - Each input uses class `listening-answer`, a stable `data-listening-gap` index, and an accessible label identifying its gap. Existing audio element and `data-action="check-listening"` button remain.
 
-- [ ] Replace the escaped scalar prompt and standalone answer field in `listeningCard` with escaped text segments interleaved with indexed inline inputs.
-- [ ] Render each gap’s saved value and independent status class; disable inputs until audio is played and after the answer set is locked.
-- [ ] Style inputs as inline prompt fields with widths that fit answers while wrapping naturally on smaller screens; retain distinct correct and incorrect colors.
-- [ ] Manually inspect generated card markup for LS01, LS03, LS05, and LS06 to cover two-, three-, and one-gap layouts, including keyboard focus labels.
+- [x] Replace the escaped scalar prompt and standalone answer field in `listeningCard` with escaped text segments interleaved with indexed inline inputs.
+- [x] Render each gap’s saved value and independent status class; disable inputs until audio is played and after the answer set is locked.
+- [x] Style inputs as inline prompt fields with widths that fit answers while wrapping naturally on smaller screens; retain distinct correct and incorrect colors.
+- [x] Inspect the prompt template for LS01, LS03, LS05, and LS06 gap counts, accessibility labels, and responsive inline-field styling.
 
 ### Task 3: Carry gap arrays through local and multiplayer answer handling
 
