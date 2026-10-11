@@ -115,3 +115,6 @@ Rollback copy in .rollback-QUEST5.0/ (notes: QUEST-5.0-NOTES.md). 66 tests pass 
 
 ## Quiz pictures
 - 11 of 30 quiz questions (QZ02, 06, 07, 12, 14, 18, 20, 22, 25, 27, 29) show a Wikimedia Commons photo banner above the question (image field in src/data/quizBank.js, PICTURES set). Credits: assets/quiz/CREDITS.md. Rejected/poor fits archived in assets/quiz/_rejected/. Other questions render as before.
+
+## QUEST 6.0 frozen
+- Snapshot in .rollback-QUEST6.0/ (see QUEST-6.0-NOTES.md).
