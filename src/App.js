@@ -22,6 +22,7 @@ const TURN_FEEDBACK_MS = 1800;
 const CAMERA_MS = 2400;
 const MOVE_MS = 4200;
 const BACK_MS = 2000;
+const PIN_SETTLE_MS = 750;
 const isLocked = state => state?.status === 'correct' || state?.status === 'incorrect';
 const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
@@ -74,7 +75,6 @@ export function createApp(root) {
       const step=now=>{
         const pin=root.querySelector(`[data-pin="${anim.player}"]`);
         if(!pin){resolve();return;}
-        pin.classList.add('animating');
         const elapsed=Math.max(0,now-start);
         const index=Math.min(legs.length-1,Math.floor(elapsed/MOVE_MS));
         const t=Math.min(1,(elapsed-index*MOVE_MS)/MOVE_MS);
@@ -82,7 +82,7 @@ export function createApp(root) {
         const point=path.getPointAtLength(path.getTotalLength()*ease(t));
         pin.setAttribute('transform',`translate(${(point.x+Number(pin.dataset.offset)).toFixed(1)} ${(point.y+12).toFixed(1)})`);
         if(elapsed<legs.length*MOVE_MS) requestAnimationFrame(step);
-        else {pin.classList.remove('animating');resolve();}
+        else setTimeout(resolve,PIN_SETTLE_MS);
       };
       requestAnimationFrame(step);
     });
@@ -100,12 +100,11 @@ export function createApp(root) {
       const step=now=>{
         const pin=root.querySelector(`[data-pin="${back.player}"]`);
         if(!pin){resolve();return;}
-        pin.classList.add('animating');
         const t=Math.min(1,Math.max(0,now-start)/BACK_MS);
         const point=path.getPointAtLength(length*(1-ease(t)));
         pin.setAttribute('transform',`translate(${(point.x+Number(pin.dataset.offset)).toFixed(1)} ${(point.y+12).toFixed(1)})`);
         if(t<1) requestAnimationFrame(step);
-        else {pin.classList.remove('animating');resolve();}
+        else setTimeout(resolve,PIN_SETTLE_MS);
       };
       requestAnimationFrame(step);
     });

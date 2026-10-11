@@ -407,7 +407,6 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .gameplay-map .player-pin.ring-yellow circle,.gameplay-map .player-pin.ring-yellow circle.avatar-ring{stroke:#f1c64c}
 .gameplay-map .player-pin.ring-green circle,.gameplay-map .player-pin.ring-green circle.avatar-ring{stroke:#2fbf6a}
 .gameplay-map .player-pin.ring-red circle,.gameplay-map .player-pin.ring-red circle.avatar-ring{stroke:#e0313f}
-.player-pin.animating{transition:none!important}
 .gameplay-map .player-pin circle:first-of-type{stroke-width:1.2}
 .gameplay-map .player-pin.ring-yellow circle.avatar-ring,.gameplay-map .player-pin.ring-green circle.avatar-ring,.gameplay-map .player-pin.ring-red circle.avatar-ring{stroke:none}
 
