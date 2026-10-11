@@ -5,6 +5,7 @@ import { escapeHtml, laneColor } from '../../../components/view.js';
 
 export function Map(game, allEpisodes, { overlay='' }={}) {
   const episode=episode01;
+  const displayedScores=game.displayScores ?? game.scores ?? {};
   const gameplay = ['map','challenge','result'].includes(game.screen);
   const mapClass = gameplay ? `map-stage camera-${String(game.camera).replace(/\W+/g, '-')}` : 'map-stage';
   const routeVisible = Boolean(game.routeVisible || game.players.student.position > 0 || game.players.guide.position > 0);
@@ -14,6 +15,6 @@ export function Map(game, allEpisodes, { overlay='' }={}) {
     ${gameplay ? `<div class="gameplay-title"><span>${escapeHtml(episode.title)}</span><b>EPISODE 01 · ${escapeHtml(episode.start.name.split(',')[0])} → ${escapeHtml(episode.stops.at(-1).name.split(',')[0])}</b></div>` : `<div class="map-heading"><span>CHAPTER 01 · 1 OF 05</span><h1>EPISODE 01 <i>·</i> ${escapeHtml(episode.title)}</h1><p>${episode.start.name} <b>→</b> ${episode.stops.at(-1).name}</p></div>`}
     <div class="${mapClass}">${mapSvg({...episode, routeVisible},game)}${overlay}</div>
     ${gameplay && game.screen==='map' && !routeVisible ? `<div class="start-callout"><span>STOP 01</span><strong>${escapeHtml(episode.start.name)}</strong></div>` : ''}
-    ${gameplay ? `<aside class="journey-scoreboard" aria-label="Journey scoreboard"><div><span><i aria-hidden="true">${avatarHtml(game.players.student.avatar)}</i>${escapeHtml(game.players.student.name)}</span><strong>${game.scores?.student ?? 0}</strong></div><div><span><i aria-hidden="true">${avatarHtml(game.players.guide.avatar)}</i>${escapeHtml(game.players.guide.name)}</span><strong>${game.scores?.guide ?? 0}</strong></div></aside>` : routeMilestones}
+    ${gameplay ? `<aside class="journey-scoreboard" aria-label="Journey scoreboard"><div><span><i aria-hidden="true">${avatarHtml(game.players.student.avatar)}</i>${escapeHtml(game.players.student.name)}</span><strong>${displayedScores.student ?? 0}</strong></div><div><span><i aria-hidden="true">${avatarHtml(game.players.guide.avatar)}</i>${escapeHtml(game.players.guide.name)}</span><strong>${displayedScores.guide ?? 0}</strong></div></aside>` : routeMilestones}
   </div>`;
 }

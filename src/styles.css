@@ -239,6 +239,8 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .start-callout{position:absolute;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);margin-top:92px;width:min(280px,34vw);padding:13px 16px;border:1px solid #e7bd4e66;border-radius:14px;background:#08130ef0;box-shadow:0 18px 45px #0008;backdrop-filter:blur(10px);text-align:center;color:#f8f0df;pointer-events:none}
 .start-callout span{display:block;font-size:8px;letter-spacing:.2em;color:#e9bb42;font-weight:900}.start-callout strong{display:block;font:25px Georgia,serif;margin:4px 0}.start-callout small{font-size:9px;color:#b9c1b5}
 .challenge-overlay{position:absolute;z-index:10;left:9%;top:29%;width:min(360px,31vw);max-height:62%;display:flex;pointer-events:auto}
+.movement-feedback-overlay{position:absolute;z-index:10;left:50%;top:auto;bottom:50px;transform:translateX(-50%);width:min(460px,82vw);display:flex;justify-content:center;pointer-events:none}
+.movement-feedback-slip{height:50px;box-sizing:border-box;display:grid;place-items:center;padding:0 20px;border:1px solid #f2d9ce77;border-radius:12px;background:#101a15ad;backdrop-filter:blur(4px);box-shadow:0 8px 28px #0005;color:#fff4df;text-align:center;font-size:clamp(13px,1.5vw,18px);font-weight:800;line-height:1.2;white-space:pre-line}
 .challenge-overlay .challenge-card,.challenge-overlay .result-card{width:100%;min-height:0;max-height:100%;overflow:auto;padding:22px 24px;border-radius:18px;background:#dcb09fef;box-shadow:0 25px 70px #0009;border:1px solid #241b16aa;backdrop-filter:blur(7px);color:#1d211d}
 .challenge-overlay .challenge-card h2,.challenge-overlay .result-card h2{font-size:30px;margin:13px 0 9px}.challenge-overlay .challenge-card p{font-size:13px;line-height:1.45;color:#29302a}.challenge-overlay .option{background:#f2d9ceaa;padding:9px}.challenge-overlay .teacher-tools{margin-top:8px}.challenge-overlay .teacher-tools span{color:#536056}.challenge-overlay .btn{padding:11px 16px;font-size:10px}.result-overlay{top:31%}.result-overlay .result-card{text-align:center;align-items:center}.result-overlay .result-burst{font-size:38px}.result-overlay .movement{font-size:48px;margin:7px}.result-overlay .result-card p{font-size:13px;line-height:1.45}
 .gameplay-map .stop-node{transition:opacity .2s}.gameplay-map .stop-node:not(.active){opacity:.7}.gameplay-map .stop-node.active circle:first-child{filter:drop-shadow(0 0 16px #f5c84f);stroke-width:5}
@@ -256,7 +258,9 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .gameplay-map .map-world{transform-origin:0 0;transition:transform 1.8s cubic-bezier(.2,.72,.18,1);will-change:transform}
 .gameplay-map .map-base{pointer-events:none}
 .journey-route-shadow,.journey-route,.journey-route-dash{fill:none;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.journey-route{fill:none;stroke:#8f0b18;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.6 2.8;filter:drop-shadow(0 1px 1px #1c030899)}
+.journey-route{fill:none;stroke:#e65100;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.6 2.8;filter:drop-shadow(0 1px 1px #1c030899)}
+.journey-route.student{stroke:#e65100}
+.journey-route.guide{stroke:#8000ff}
 .route-reveal-mask{fill:none;stroke:#fff;stroke-width:8;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;animation:reveal-journey-dots 4.2s ease-in-out forwards}
 @keyframes reveal-journey-dots{to{stroke-dashoffset:0}}
 .city-focus{fill:#51a0ff20;stroke:#b8d3ff;stroke-width:4;stroke-dasharray:7 5;pointer-events:none;animation:focus-pulse 2.2s ease-in-out infinite}
@@ -332,7 +336,7 @@ animation:forest-light 11s ease-in-out infinite alternate}
 @media(max-width:600px){.challenge-overlay{left:4%;top:14%;width:78%;max-height:none}.challenge-overlay .challenge-card.long-question{width:100%}.challenge-overlay .challenge-card{padding:18px}.challenge-overlay .challenge-top{margin-bottom:12px}.challenge-player{font-size:12px}.challenge-overlay .challenge-card .prompt{font-size:23px}.challenge-overlay .challenge-card.quiz-question .prompt,.challenge-overlay .challenge-card.speaking-question .prompt{font-size:25px}.challenge-overlay .speaking-scores{margin-top:14px}}
 @media(max-width:900px){.gameplay-map .map-stage{height:calc(100svh - 76px);min-height:0}.journey-scoreboard{right:12px;bottom:12px;min-width:240px}.map-arrival{left:12px;bottom:12px}.challenge-overlay{left:4%;top:18%;bottom:auto;width:min(360px,36vw);max-height:68%}}
 @media(max-width:600px){.gameplay-map .map-stage{height:calc(100svh - 76px);min-height:0}.map-camera-tools{top:62px;right:10px}.journey-scoreboard{right:10px;bottom:10px;min-width:0;padding:10px 6px;max-width:72vw}.journey-scoreboard div{gap:6px;padding:0 7px}.journey-scoreboard span{font-size:8px}.journey-scoreboard span i{font-size:16px}.journey-scoreboard strong{font-size:22px}.map-arrival{left:10px;bottom:78px}.challenge-overlay{left:4%;top:16%;bottom:auto;width:68%;max-height:68%}.start-callout{bottom:12px;width:min(290px,78vw)}}
-@media(prefers-reduced-motion:reduce){.gameplay-map .map-world,.journey-route,.route-reveal-mask,.city-focus{animation:none!important;transition:none!important}.route-reveal-mask{stroke-dashoffset:0}}
+@media(prefers-reduced-motion:reduce){.gameplay-map .map-world,.journey-route,.route-reveal-mask,.city-focus{animation:none!important;transition:none!important}}
 /* Listening engine */
 .listening-player{display:flex;align-items:center;gap:14px;margin:4px 0 12px}
 .listening-hint{font-size:13px;font-weight:700;color:#3c4a3f}
@@ -362,6 +366,7 @@ animation:forest-light 11s ease-in-out infinite alternate}
 
 /* Episode 01 skill cards, route legs and turn feedback */
 .route-reveal-mask.drawn{animation:none;stroke-dashoffset:0}
+.route-reveal-mask.partial{animation:none}
 .route-reveal-mask.drawing{animation:reveal-journey-dots 4.2s ease-in-out forwards}
 .retry-chip{background:#8f0b18;color:#fff;font:900 10px Arial,sans-serif;letter-spacing:.14em;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .challenge-overlay .speaking-scores.retry-reasons{grid-template-columns:repeat(3,minmax(0,1fr)) auto}
@@ -403,12 +408,14 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .gameplay-map .challenge-overlay .challenge-media{flex:1 1 auto;min-height:0;display:grid;place-items:center;margin:4px 0}
 .gameplay-map .challenge-overlay .challenge-media img,.gameplay-map .challenge-overlay .challenge-media svg{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 @media(max-width:700px){.gameplay-map .challenge-overlay{left:3%;width:94%;top:clamp(80px,13vh,120px)}}
-/* Ring state: yellow = not started, green = progressing, red = retrying. */
-.gameplay-map .player-pin.ring-yellow circle,.gameplay-map .player-pin.ring-yellow circle.avatar-ring{stroke:#f1c64c}
+/* Ring state is independent of road color: green for progress, red for retry or a setback. */
 .gameplay-map .player-pin.ring-green circle,.gameplay-map .player-pin.ring-green circle.avatar-ring{stroke:#2fbf6a}
 .gameplay-map .player-pin.ring-red circle,.gameplay-map .player-pin.ring-red circle.avatar-ring{stroke:#e0313f}
+.gameplay-map .player-pin.ring-none circle:first-of-type{stroke:#17241d}
+.gameplay-map .player-pin.ring-green circle:first-of-type{stroke:#2fbf6a}
+.gameplay-map .player-pin.ring-red circle:first-of-type{stroke:#e0313f}
 .gameplay-map .player-pin circle:first-of-type{stroke-width:1.2}
-.gameplay-map .player-pin.ring-yellow circle.avatar-ring,.gameplay-map .player-pin.ring-green circle.avatar-ring,.gameplay-map .player-pin.ring-red circle.avatar-ring{stroke:none}
+.gameplay-map .player-pin.ring-green circle.avatar-ring,.gameplay-map .player-pin.ring-red circle.avatar-ring{stroke:none}
 
 /* LOBBY (first page: HOST / SOLO / invite link) */
 .lobby{display:flex;flex-direction:column;align-items:center}.lobby>.btn{position:static;min-width:256px;margin:35px 0 0;transform:none}.lobby>.btn:hover:not(:disabled){transform:translateY(-3px)}
@@ -431,7 +438,7 @@ animation:forest-light 11s ease-in-out infinite alternate}
 /* ONLINE JUDGING */
 .speaking-scores .btn.chosen:disabled{opacity:1;filter:none;outline:3px solid #fff7;outline-offset:2px;transform:scale(1.04)}
 .speaking-scores .btn:disabled:not(.chosen){opacity:.45}
-.player-preview-notice{margin:10px 0 0;max-width:340px;text-align:center;font:800 14px/1.35 system-ui,sans-serif;color:#7a2418}
+.quiz-effect-feedback{margin:8px 0 0;padding:10px 12px;border-left:3px solid #e3b84d;border-radius:0 8px 8px 0;background:#16332412;color:#203027;font:800 13px/1.4 system-ui,sans-serif}
 .quiz-punish{display:flex;flex-wrap:wrap;gap:8px}
 .quiz-punish .btn span{display:block;font-size:11px;opacity:.8}
 .quiz-punish .btn.spent{filter:grayscale(1);opacity:.55}
@@ -452,6 +459,42 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .gameplay-map .challenge-overlay .quiz-photo-actions .reward-title{text-align:left;margin:0 0 8px}
 .gameplay-map .challenge-overlay .quiz-photo-actions .quiz-punish{width:min(100%,360px)}
 @media(max-width:600px){.gameplay-map .challenge-overlay .challenge-card.quiz-photo-card{grid-template-rows:auto minmax(0,1fr) auto}.gameplay-map .challenge-overlay .quiz-photo-content{grid-template-columns:minmax(0,2fr) minmax(74px,1fr);gap:8px}}
+
+/* Episode 01 finish celebrations and Istanbul completion screen. */
+.gameplay-map .challenge-overlay.finish-overlay{left:50%;top:50%;right:auto;bottom:auto;width:min(720px,88vw);max-height:none;transform:translate(-50%,-50%);display:block}
+.finish-celebration{position:relative;overflow:hidden;width:100%;box-sizing:border-box;padding:clamp(20px,4vh,38px);border:1px solid #fff8;border-radius:22px;background:linear-gradient(145deg,#fff5dfef,#e7c49af2);box-shadow:0 24px 90px #000b;color:#142219;text-align:center;animation:finish-arrive .65s cubic-bezier(.2,.8,.2,1) both}
+.finish-checkers{height:20px;border:2px solid #fff;border-radius:4px;background:repeating-conic-gradient(#fff 0 25%,#121212 0 50%) 50%/24px 24px;box-shadow:0 3px 10px #0003}
+.finish-place{margin:20px 0 8px;color:#a67617;font:900 11px/1 system-ui,sans-serif;letter-spacing:.25em}
+.finish-player{display:flex;align-items:center;justify-content:center;gap:15px;font:700 clamp(30px,5vw,54px)/1.05 Georgia,serif}
+.finish-player>span,.finish-player img{width:clamp(56px,8vw,86px);height:clamp(56px,8vw,86px);border-radius:50%;object-fit:cover}
+.finish-congrats{margin:15px 0 19px;color:#435346;font:600 16px system-ui,sans-serif}
+.finish-celebration-winner{box-shadow:0 24px 100px #000b,0 0 0 5px #f4cf5b,0 0 55px #f4cf5b99;animation:finish-arrive .65s cubic-bezier(.2,.8,.2,1) both,finish-glow 1.7s ease-in-out infinite alternate}
+.finish-celebration-winner:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 8% 18%,#ef4d45 0 4px,transparent 5px),radial-gradient(circle at 92% 24%,#f0c53d 0 5px,transparent 6px),radial-gradient(circle at 16% 82%,#42a979 0 4px,transparent 5px),radial-gradient(circle at 85% 78%,#467ec4 0 5px,transparent 6px);animation:finish-confetti 2.3s ease-in-out infinite alternate}
+.finish-celebration-runner-up{width:min(590px,100%);padding:22px 28px;border-color:#fff5;box-shadow:0 18px 55px #0009;animation:finish-arrive .55s ease-out both}
+.finish-celebration-runner-up .finish-checkers{height:13px;background-size:18px 18px}.finish-celebration-runner-up .finish-place{margin-top:12px}.finish-celebration-runner-up .finish-congrats{margin:10px 0}
+@keyframes finish-arrive{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes finish-glow{to{box-shadow:0 24px 100px #000b,0 0 0 8px #f4cf5b,0 0 70px #f4cf5bbb}}
+@keyframes finish-confetti{to{transform:translateY(8px) rotate(2deg);filter:saturate(1.4)}}
+.report{position:relative;min-height:100svh;overflow:hidden;padding:24px;box-sizing:border-box;background:#14251b}
+.report-video,.report-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.report-video{z-index:0}
+.report-art{z-index:1;clip-path:none;opacity:1;background:linear-gradient(90deg,#07130ee8,#0b1c15b8 48%,#07130edb),linear-gradient(0deg,#08130fe0,transparent 60%)}
+.report-content{width:min(1000px,94vw);box-sizing:border-box;padding:clamp(22px,4vw,48px);border:1px solid #fff3;border-radius:24px;background:#0e1d16b8;backdrop-filter:blur(7px);text-align:center}
+.report-content .eyebrow{font-size:11px;font-weight:900;letter-spacing:.32em;color:#f0c64e}
+.report h1{font-size:clamp(42px,6vw,76px);margin:12px 0}.report p{max-width:700px;margin:0 auto;color:#ece6d6;line-height:1.6}
+.report-card{grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:12px;background:transparent;margin:28px auto}
+.report-rank{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;align-items:center;column-gap:12px;row-gap:5px;padding:18px 20px;background:#07150fcc;border:1px solid #ffffff26;border-radius:16px;text-align:left}
+.report-rank>small{grid-column:1/-1;color:#eac34f;font-size:10px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}
+.report-avatar,.report-avatar img{grid-row:2;width:52px;height:52px;border-radius:50%;object-fit:cover}
+.report-rank>strong{grid-row:2;color:#fff7e7;font-size:clamp(16px,2vw,22px)}
+.report-rank>b{grid-row:2;color:#f1c64a;font:700 26px Georgia,serif;white-space:nowrap}
+.report-rank>b small{margin-left:4px;font:800 9px system-ui,sans-serif;letter-spacing:.1em}
+.report-winner{border-color:#f1c64a99;box-shadow:inset 0 0 24px #f1c64a14}
+.report-runner-up>small{color:#c8d0c5}
+.report-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.report-actions .btn{min-width:220px}
+.timeout-clock{display:inline-flex;align-items:center;justify-content:center;margin:0 auto 14px;padding:10px 18px;border:3px solid #fff;background:#101010;color:#fff;font-size:clamp(18px,2.5vw,28px);font-weight:1000;letter-spacing:.2em;box-shadow:5px 5px 0 #fff}
+.timeout-report .report-content{border-color:#fff8}.timeout-report .report-content .eyebrow{color:#fff}.timeout-report h1{color:#fff;letter-spacing:.03em}.timeout-report .report-actions .btn[disabled]{opacity:.45;cursor:not-allowed;filter:grayscale(1)}
+@media(max-width:600px){.gameplay-map .challenge-overlay.finish-overlay{width:92vw}.finish-celebration{padding:18px}.finish-player{font-size:32px}.report{padding:12px}.report-content{width:100%;padding:20px 14px}.report-card{grid-template-columns:1fr;margin:18px auto}.report-rank{padding:14px}.report-actions{flex-direction:column}.report-actions .btn{width:100%;min-width:0}}
 
 .reward-title{margin:12px 0 8px;font-size:10px;font-weight:900;letter-spacing:.22em;color:#7a6a3a;text-align:center}
 .quiz-punish{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}

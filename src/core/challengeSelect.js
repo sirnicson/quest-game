@@ -28,6 +28,15 @@ export function shuffledChallenge(item, seed) {
 export function currentChallenge(game) {
   const player = game.activePlayer || 'student';
   const deck = deckFor(game)[player];
-  const id = game.override?.[player] ?? deck[game.players[player].position];
+  const index = game.players[player].challengeIndex ?? game.players[player].position;
+  let id = game.override?.[player] ?? deck[index];
+  if (!id && index >= deck.length) {
+    const previous = challengeById(deck.at(-1))?.lane;
+    const pool = Object.values(bankIds).flat()
+      .filter(candidate => challengeById(candidate)?.lane !== 'Quiz'
+        && challengeById(candidate)?.lane !== previous);
+    const random = mulberry32((Number(game.seed ?? game.optionSeed ?? 0) + hashId(`${player}:${index}`)) >>> 0);
+    id = pool[Math.floor(random() * pool.length)];
+  }
   return id ? shuffledChallenge(challengeById(id), game.optionSeed ?? game.seed) : null;
 }

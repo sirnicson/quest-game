@@ -5,7 +5,7 @@ import { createInitialGame, applyMovement, advanceScreen, completePlayerTurn, re
 test('starts on splash with two players at START', () => {
   const game = createInitialGame();
   assert.equal(game.screen, 'splash');
-  assert.equal(game.timerSeconds, 3000);
+  assert.equal(game.timerSeconds, 3600);
   assert.equal(game.players.student.position, 0);
   assert.equal(game.players.guide.position, 0);
 });
@@ -42,14 +42,14 @@ test('each player turn starts with a preview before the challenge', () => {
   assert.equal(game.playerPreview, true);
 });
 
-test('clamps movement to START and FINISH', () => {
+test('movement uses point awards and clamps at the next city and FINISH', () => {
   let game = createInitialGame();
   game = applyMovement(game, 'student', 2);
-  assert.equal(game.players.student.position, 2);
+  assert.equal(game.players.student.position, 0.4);
   game = applyMovement(game, 'student', -5);
   assert.equal(game.players.student.position, 0);
-  game = applyMovement(game, 'student', 30);
-  assert.equal(game.players.student.position, 15);
+  for (let city = 0; city < 14; city++) game = applyMovement(game, 'student', 5);
+  assert.equal(game.players.student.position, 14);
 });
 
 test('a failed player stays at their own stop while the other player can advance', () => {
@@ -60,23 +60,23 @@ test('a failed player stays at their own stop while the other player can advance
   assert.equal(game.activePlayer, 'guide');
 
   game = completePlayerTurn(game, 1);
-  assert.equal(game.players.guide.position, 1);
+  assert.equal(game.players.guide.position, 0.2);
   assert.equal(game.activePlayer, 'student');
 
   game = completePlayerTurn(game, 0);
   assert.equal(game.players.student.position, 0);
-  assert.equal(game.players.guide.position, 1);
+  assert.equal(game.players.guide.position, 0.2);
   assert.equal(game.activePlayer, 'guide');
-  assert.equal(game.activeStop, 2);
+  assert.equal(game.activeStop, 1);
 
   game = completePlayerTurn(game, 0);
   assert.equal(game.players.student.position, 0);
-  assert.equal(game.players.guide.position, 1);
+  assert.equal(game.players.guide.position, 0.2);
   assert.equal(game.activePlayer, 'student');
 
   game = completePlayerTurn(game, 5);
   assert.equal(game.players.student.position, 1);
-  assert.equal(game.players.guide.position, 1);
+  assert.equal(game.players.guide.position, 0.2);
   assert.equal(game.activePlayer, 'guide');
 });
 
@@ -89,9 +89,9 @@ test('entry point references the actual application module', async () => {
 
 test('finishing the final stop produces a finish-line state', () => {
   let game = createInitialGame();
-  game = applyMovement(game, 'student', 15);
-  assert.equal(game.players.student.position, 15);
-  assert.equal(game.players.student.position === 15, true);
+  for (let city = 0; city < 14; city++) game = applyMovement(game, 'student', 5);
+  assert.equal(game.players.student.position, 14);
+  assert.equal(game.players.student.position === 14, true);
 });
 
 test('ENTER QUEST advances the splash into the proclamation', () => {
@@ -104,8 +104,8 @@ test('player profiles can be edited independently', () => {
   let game = createInitialGame();
   game = reduceAction(game, { type: 'set-player', player: 'student', name: 'Ada', avatar: '🧗' });
   game = reduceAction(game, { type: 'set-player', player: 'guide', name: 'Sam', avatar: '🧭' });
-  assert.deepEqual(game.players.student, { position: 0, name: 'Ada', avatar: '🧗' });
-  assert.deepEqual(game.players.guide, { position: 0, name: 'Sam', avatar: '🧭' });
+  assert.deepEqual(game.players.student, { position: 0, challengeIndex: 0, name: 'Ada', avatar: '🧗' });
+  assert.deepEqual(game.players.guide, { position: 0, challengeIndex: 0, name: 'Sam', avatar: '🧭' });
 });
 
 test('skills screen cards match challenge lanes without descriptive subtext', async () => {
@@ -139,7 +139,7 @@ test('back returns to the previous screen and home reset clears the session', ()
   assert.equal(game.screen, 'splash');
   assert.equal(game.players.student.name, 'Player 1');
   assert.equal(game.players.student.position, 0);
-  assert.equal(game.timerSeconds, 3000);
+  assert.equal(game.timerSeconds, 3600);
   assert.deepEqual(game.history, []);
 });
 

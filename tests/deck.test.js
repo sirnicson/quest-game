@@ -7,14 +7,18 @@ import { currentChallenge } from '../src/core/challengeSelect.js';
 import { journey } from '../src/data/episodes/episode01.js';
 
 test('writing verdicts unlock by word count', () => {
-  const item = { minWords: 25 };
+  const item = { minWords: 20, maxWords: 30 };
   const words = n => Array(n).fill('word').join(' ');
   assert.deepEqual(writingVerdicts(item, ''), []);
-  assert.deepEqual(writingVerdicts(item, words(1)), ['RETRY']);
-  assert.deepEqual(writingVerdicts(item, words(10)), ['RETRY']);
-  assert.deepEqual(writingVerdicts(item, words(11)), ['RETRY', 'FAIR']);
-  assert.deepEqual(writingVerdicts(item, words(24)), ['RETRY', 'FAIR']);
-  assert.deepEqual(writingVerdicts(item, words(25)), ['RETRY', 'FAIR', 'GOOD']);
+  assert.deepEqual(writingVerdicts(item, words(9)), ['RETRY']);
+  assert.deepEqual(writingVerdicts(item, words(10)), ['RETRY', 'FAIR']);
+  assert.deepEqual(writingVerdicts(item, words(19)), ['RETRY', 'FAIR']);
+  assert.deepEqual(writingVerdicts(item, words(20)), ['RETRY', 'FAIR', 'GOOD']);
+  assert.deepEqual(writingVerdicts(item, words(31)), ['RETRY', 'FAIR', 'GOOD']);
+});
+
+test('new games start with a 60-minute episode clock', () => {
+  assert.equal(createInitialGame().timerSeconds, 3600);
 });
 
 test('bank has 10 items per episode skill and a central quiz bank of 30 general-knowledge items', () => {
@@ -29,17 +33,19 @@ test('bank has 10 items per episode skill and a central quiz bank of 30 general-
   }
 });
 
-test('each player gets an independent 15-challenge deck: 3 per skill, no repeats, no shared questions', () => {
+test('each player has 15 initial challenges with 3 per skill and a unique-question continuation', () => {
   const { student, guide } = buildDecks(bankIds, 42);
   for (const deck of [student, guide]) {
-    assert.equal(deck.length, 15);
-    assert.equal(new Set(deck).size, 15);
+    assert.equal(deck.length, 43);
+    assert.equal(new Set(deck).size, 43);
     for (const skill of ['Quiz', 'Reading', 'Speaking', 'Writing', 'Listening']) {
-      assert.equal(deck.filter(id => challengeById(id).lane === skill).length, 3);
+      assert.equal(deck.slice(0, 15).filter(id => challengeById(id).lane === skill).length, 3);
+      assert.equal(deck.filter(id => challengeById(id).lane === skill).length, skill === 'Quiz' ? 3 : 10);
     }
-    deck.slice(1).forEach((id, i) => assert.notEqual(challengeById(id).lane, challengeById(deck[i]).lane));
+    assert.equal(deck.filter(id => challengeById(id).lane === 'Quiz').length, 3);
+    deck.slice(1, 15).forEach((id, i) => assert.notEqual(challengeById(id).lane, challengeById(deck[i]).lane));
   }
-  assert.equal(student.filter(id => guide.includes(id)).length, 0);
+  assert.equal(student.slice(0, 15).filter(id => guide.slice(0, 15).includes(id)).length, 0);
   assert.notDeepEqual(student, guide);
 });
 
@@ -91,9 +97,9 @@ test('a failed non-quiz challenge keeps the same question, marks RETRY, and the 
   const base = reduceAction(createInitialGame(), { type: 'start-episode', episodeId: 1, seed: 5 });
   const nonQuiz = id => challengeById(id).lane !== 'Quiz';
   const idx = base.decks.student.findIndex(nonQuiz);
-  const game = { ...base, players: { ...base.players, student: { ...base.players.student, position: idx } } };
+  const game = { ...base, players: { ...base.players, student: { ...base.players.student, challengeIndex: idx } } };
   const failed = completePlayerTurn(game, 0);
-  assert.equal(failed.players.student.position, idx);
+  assert.equal(failed.players.student.challengeIndex, idx);
   assert.equal(failed.retry.student, true);
   assert.equal(failed.moveAnim, null);
   const back = completePlayerTurn(failed, 0);
@@ -104,7 +110,7 @@ test('a failed quiz retries with a different, unseen question that is not in eit
   const base = reduceAction(createInitialGame(), { type: 'start-episode', episodeId: 1, seed: 5 });
   const idx = base.decks.student.findIndex(id => challengeById(id).lane === 'Quiz');
   const quizId = base.decks.student[idx];
-  let game = { ...base, players: { ...base.players, student: { ...base.players.student, position: idx } } };
+  let game = { ...base, players: { ...base.players, student: { ...base.players.student, challengeIndex: idx } } };
   const inDecks = new Set([...base.decks.student, ...base.decks.guide]);
   const seen = new Set([quizId]);
   for (let i = 0; i < 4; i++) {
@@ -121,53 +127,88 @@ test('a failed quiz retries with a different, unseen question that is not in eit
   assert.equal(currentChallenge({ ...ok, activePlayer: 'student' }).id, base.decks.student[idx + 1]);
 });
 
-test('a finished player is skipped; both finished goes to the report', () => {
+test('the first finisher and runner-up celebrate before the completion report', () => {
   let game = reduceAction(createInitialGame(), { type: 'start-episode', episodeId: 1, seed: 5 });
-  game = { ...game, players: { ...game.players, student: { ...game.players.student, position: 14 }, guide: { ...game.players.guide, position: 15 } } };
-  const done = completePlayerTurn(game, 5);
-  assert.equal(done.players.student.position, 15);
-  assert.equal(done.screen, 'report');
-  game = { ...game, players: { ...game.players, student: { ...game.players.student, position: 3 } } };
+  game = atPositions(game, 14, 3);
+  const first = completePlayerTurn(game, 5);
+  assert.equal(first.players.student.position, 14);
+  assert.equal(first.winner, 'student');
+  assert.equal(first.screen, 'challenge');
+  assert.deepEqual(first.finishCelebration, { player: 'student', place: 'winner' });
+  assert.equal(first.activePlayer, 'guide');
+  game = { ...first, scores: { ...first.scores, guide: 70 }, players: { ...first.players, guide: { ...first.players.guide, challengeIndex: 14, position: 14 } } };
+  const second = completePlayerTurn(game, 5);
+  assert.equal(second.screen, 'challenge');
+  assert.deepEqual(second.finishCelebration, { player: 'guide', place: 'runner-up' });
+  assert.equal(second.reportPending, true);
+  const skipBase = reduceAction(createInitialGame(), { type: 'start-episode', episodeId: 1, seed: 5 });
+  game = { ...atPositions(skipBase, 3, 15), activePlayer: 'guide' };
   const skip = completePlayerTurn(game, 0);
   assert.equal(skip.activePlayer, 'student');
   assert.equal(skip.screen, 'challenge');
 });
 
 const startedGame = (seed = 5) => reduceAction(createInitialGame(), { type: 'start-episode', episodeId: 1, seed });
-const atPositions = (game, student, guide, scores = game.scores) => ({
-  ...game, scores,
-  players: { ...game.players, student: { ...game.players.student, position: student }, guide: { ...game.players.guide, position: guide } }
-});
+const atPositions = (game, student, guide, suppliedScores = null) => {
+  const scores = suppliedScores ?? { student: student * 5, guide: guide * 5 };
+  return {
+    ...game,
+    scores,
+    players: {
+      ...game.players,
+      student: { ...game.players.student, challengeIndex: student, position: Math.max(0, Math.min(14, scores.student / 5)) },
+      guide: { ...game.players.guide, challengeIndex: guide, position: Math.max(0, Math.min(14, scores.guide / 5)) }
+    },
+    earnedByStop: {
+      student: { ...(game.earnedByStop?.student ?? {}), ...(student > 0 ? { [student]: Math.min(5, scores.student) } : {}) },
+      guide: { ...(game.earnedByStop?.guide ?? {}), ...(guide > 0 ? { [guide]: Math.min(5, scores.guide) } : {}) }
+    }
+  };
+};
 const firstNonQuizAt = (game, player) => game.decks[player].findIndex(id => challengeById(id).lane !== 'Quiz' && challengeById(id).lane !== 'Listening');
 
 test('failing the same stop twice sends the player one stop back, except at London', () => {
   const base = startedGame();
   const idx = Math.max(1, firstNonQuizAt(base, 'student'));
-  let game = atPositions(base, idx, 0);
+  let game = atPositions(base, idx, 0, { student: 0, guide: 0 });
   game = completePlayerTurn(game, 0);
   game = completePlayerTurn({ ...game, activePlayer: 'student' }, 0);
-  assert.equal(game.players.student.position, idx - 1);
+  assert.equal(game.players.student.position, Math.max(0, idx - 1));
   assert.match(game.notice, /falls back 1 stop/);
   let london = atPositions(base, 0, 0);
   for (let i = 0; i < 3; i++) london = completePlayerTurn({ ...completePlayerTurn({ ...london, activePlayer: 'student' }, 0), activePlayer: 'student' }, 0);
   assert.equal(london.players.student.position, 0);
 });
 
-test('a retry is capped at 3 pts, keeps its reason, and both reset after a drop', () => {
+test('an automatic setback moves to the previous city checkpoint and aligns the score', () => {
   const base = startedGame();
   const idx = Math.max(1, firstNonQuizAt(base, 'student'));
-  let game = atPositions(base, idx, 0);
+  let game = { ...atPositions(base, idx, 0, { student: 8, guide: 0 }), earnedByStop: { student: { [idx]: 5 }, guide: {} } };
+  game = completePlayerTurn(game, 0);
+  const back = completePlayerTurn({ ...game, activePlayer: 'student' }, 0);
+  assert.equal(back.players.student.position, 1);
+  assert.equal(back.scores.student, 5);
+  assert.equal(back.earnedByStop.student[idx], 0);
+});
+
+test('a retry keeps its reason and awards the full 5, 2, or 0 points', () => {
+  const base = startedGame();
+  const idx = Math.max(1, firstNonQuizAt(base, 'student'));
+  let game = atPositions(base, idx, 0, { student: 0, guide: 0 });
   game = completePlayerTurn({ ...game, verdictReason: 'SHORT' }, 0);
   assert.equal(game.retry.student, true);
   assert.equal(game.retryReason.student, 'SHORT');
   assert.equal(game.verdictReason, null);
-  const capped = completePlayerTurn({ ...game, activePlayer: 'student' }, 5);
-  assert.equal(capped.scores.student, 3);
-  assert.equal(capped.retryReason.student, null);
+  const goodRetry = completePlayerTurn({ ...game, activePlayer: 'student' }, 5);
+  assert.equal(goodRetry.scores.student, 5);
+  assert.equal(goodRetry.retryReason.student, null);
   const fair = completePlayerTurn({ ...game, activePlayer: 'student' }, 2);
   assert.equal(fair.scores.student, 2);
+  const stillRetrying = completePlayerTurn({ ...game, activePlayer: 'student' }, 0);
+  assert.equal(stillRetrying.scores.student, 0);
+  assert.equal(stillRetrying.players.student.challengeIndex, game.players.student.challengeIndex);
   const dropped = completePlayerTurn({ ...game, activePlayer: 'student', verdictReason: 'UNCLEAR' }, 0);
-  assert.equal(dropped.players.student.position, idx - 1);
+  assert.equal(dropped.players.student.position, 0);
   assert.equal(dropped.retry.student, false);
   assert.equal(dropped.retryReason.student, null);
   const fresh = completePlayerTurn({ ...dropped, activePlayer: 'student' }, 5);
@@ -206,32 +247,41 @@ test('a failed Quiz never counts toward the two-fail drop', () => {
   let game = atPositions({ ...base, decks }, 2, 0);
   for (let i = 0; i < 2; i++) {
     game = completePlayerTurn({ ...game, activePlayer: 'student', override: { student: null, guide: null } }, 0);
-    assert.equal(game.players.student.position, 2);
+    assert.equal(game.players.student.challengeIndex, 2);
   }
 });
 
-test('the first player to finish stop 15 gets +10 once', () => {
+test('the first player to finish stop 14 gets +10 once', () => {
   const base = startedGame();
-  const first = completePlayerTurn(atPositions(base, 14, 3, { student: 5, guide: 0 }), 5);
+  const first = completePlayerTurn(atPositions(base, 14, 3, { student: 70, guide: 15 }), 5);
   assert.equal(first.winner, 'student');
-  assert.equal(first.scores.student, 20);
-  const second = completePlayerTurn({ ...first, activePlayer: 'guide', players: { ...first.players, guide: { ...first.players.guide, position: 14 } } }, 5);
-  assert.equal(second.scores.guide, 5);
+  assert.equal(first.scores.student, 80);
+  const second = completePlayerTurn({ ...first, activePlayer: 'guide', scores: { ...first.scores, guide: 70 }, players: { ...first.players, guide: { ...first.players.guide, challengeIndex: 14, position: 14 } } }, 5);
+  assert.equal(second.scores.guide, 70);
   assert.equal(second.winner, 'student');
 });
 
-test('Quiz sits on the same 3 random stops (2-14, never adjacent) in both decks and changes with the seed', () => {
+test('each player gets 3 independently randomized Quiz stops and distinct questions', () => {
   const seen = new Set();
+  let schedulesDiffer = false;
   for (let seed = 1; seed <= 40; seed++) {
     const { student, guide, quizStops } = buildDecks(bankIds, seed);
-    assert.equal(quizStops.length, 3);
-    quizStops.forEach((index, i) => {
-      assert.ok(index >= 1 && index <= 13);
-      if (i) assert.ok(index - quizStops[i - 1] > 1);
-    });
-    for (const deck of [student, guide]) deck.forEach((id, i) => assert.equal(challengeById(id).lane === 'Quiz', quizStops.includes(i)));
-    seen.add(quizStops.join());
+    for (const [player, deck] of [['student', student], ['guide', guide]]) {
+      const stops = quizStops[player];
+      assert.equal(stops.length, 3);
+      stops.forEach((index, i) => {
+        assert.ok(index >= 1 && index <= 13);
+        if (i) assert.ok(index - stops[i - 1] > 1);
+      });
+      deck.forEach((id, i) => assert.equal(challengeById(id).lane === 'Quiz', stops.includes(i)));
+      seen.add(stops.join());
+    }
+    schedulesDiffer ||= quizStops.student.join() !== quizStops.guide.join();
+    for (let i = 0; i < 15; i++) {
+      if (challengeById(student[i]).lane === 'Quiz' && challengeById(guide[i]).lane === 'Quiz') assert.notEqual(student[i], guide[i]);
+    }
   }
+  assert.ok(schedulesDiffer);
   assert.ok(seen.size > 5);
 });
 
@@ -239,40 +289,157 @@ test('Quiz rewards: only unspent, effective ones are offered; each is once per p
   const base = startedGame();
   assert.deepEqual(punishOptions(atPositions(base, 2, 0, { student: 0, guide: 0 })), ['freeze', 'boost']);
   assert.deepEqual(punishOptions(atPositions(base, 2, 4, { student: 0, guide: 3 })), ['freeze', 'back', 'boost']);
-  assert.deepEqual(punishOptions(atPositions(base, 6, 2, { student: 9, guide: 3 })), ['freeze', 'back']);
+  assert.deepEqual(punishOptions(atPositions(base, 6, 2, { student: 9, guide: 3 })), ['freeze', 'back', 'boost']);
   const spent = { ...atPositions(base, 2, 4, { student: 0, guide: 0 }), rewardsUsed: { student: ['freeze'], guide: [] } };
-  assert.deepEqual(punishOptions(spent), ['back', 'boost']);
-  assert.deepEqual(punishOptions({ ...spent, activePlayer: 'guide' }), ['freeze', 'back', 'boost']);
+  assert.deepEqual(punishOptions(spent), ['boost']);
+  assert.deepEqual(punishOptions({ ...spent, activePlayer: 'guide' }), ['freeze', 'boost']);
   assert.deepEqual(punishOptions(atPositions(base, 2, 15)), []);
 });
 
-test('Quiz rewards apply at once and are spent: freeze, back (-2 PTS), boost (max 2 stops)', () => {
+test('Quiz Go Back moves the opponent to the previous city checkpoint with aligned score', () => {
+  const base = startedGame();
+  const g = {
+    ...atPositions(base, 4, 5, { student: 0, guide: 12 }),
+    earnedByStop: { student: {}, guide: { 5: 1 } }
+  };
+  assert.deepEqual(punishOptions(g), ['freeze', 'back', 'boost']);
+  const back = completePlayerTurn({ ...g, punish: { type: 'back', by: 'student' } }, 5);
+  assert.equal(back.players.student.position, 1);
+  assert.equal(back.players.guide.position, 2);
+  assert.equal(back.scores.student, 5);
+  assert.equal(back.scores.guide, 10);
+  assert.equal(back.earnedByStop.guide[5], 0);
+});
+
+test('Quiz Go Back keeps score and route position aligned', () => {
+  const base = startedGame();
+  const g = {
+    ...atPositions(base, 4, 4, { student: 0, guide: 10 }),
+    earnedByStop: { student: {}, guide: { 4: 1 } }
+  };
+  assert.deepEqual(punishOptions(g), ['freeze', 'back', 'boost']);
+  const withBack = completePlayerTurn({ ...g, punish: { type: 'back', by: 'student' } }, 5);
+  assert.equal(withBack.players.guide.position, 1);
+  assert.equal(withBack.scores.guide, 5);
+  assert.equal(withBack.players.guide.position, withBack.scores.guide / 5);
+});
+
+test('Quiz Go Back does not create score and path order inversions across close, aligned standings', () => {
+  const base = startedGame();
+  const hasHigherScoreBehind = game =>
+    (game.scores.student > game.scores.guide && game.players.student.position < game.players.guide.position)
+    || (game.scores.guide > game.scores.student && game.players.guide.position < game.players.student.position);
+  for (let studentPosition = 0; studentPosition < 15; studentPosition++) {
+    for (let guidePosition = 1; guidePosition < 15; guidePosition++) {
+      if (Math.abs(studentPosition - guidePosition) > 2) continue;
+      for (const studentScore of [0, 5, 10, 20, 40]) {
+        for (const guideScore of [0, 5, 10, 20, 40]) {
+          if ((studentScore > guideScore && studentPosition < guidePosition)
+            || (guideScore > studentScore && guidePosition < studentPosition)) continue;
+          for (const activePlayer of ['student', 'guide']) {
+            const victim = activePlayer === 'student' ? 'guide' : 'student';
+            const victimPosition = victim === 'student' ? studentPosition : guidePosition;
+            const victimScore = victim === 'student' ? studentScore : guideScore;
+            for (const earned of new Set([0, Math.min(1, victimScore), Math.min(5, victimScore)])) {
+              const game = {
+                ...atPositions(base, studentPosition, guidePosition, { student: studentScore, guide: guideScore }),
+                activePlayer,
+                earnedByStop: { student: {}, guide: {}, [victim]: { [victimPosition]: earned } }
+              };
+              const withoutBack = completePlayerTurn(game, 5);
+              const result = completePlayerTurn({ ...game, punish: { type: 'back', by: activePlayer } }, 5);
+              if (hasHigherScoreBehind(result)) {
+                assert.equal(result.players[victim].position, withoutBack.players[victim].position, `${studentPosition}/${guidePosition}, ${studentScore}/${guideScore}, ${activePlayer}, stop points ${earned}`);
+                assert.equal(result.scores[victim], withoutBack.scores[victim], `${studentPosition}/${guidePosition}, ${studentScore}/${guideScore}, ${activePlayer}, stop points ${earned}`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+test('Quiz Boost always puts its user ahead in both score and route position', () => {
+  const base = startedGame();
+  for (const studentScore of [0, 2, 5, 12, 20, 30, 40, 60, 65]) {
+    for (const guideScore of [0, 2, 5, 12, 20, 30, 40, 60, 65]) {
+      const game = atPositions(base, studentScore / 5, guideScore / 5, { student: studentScore, guide: guideScore });
+      const result = completePlayerTurn({ ...game, punish: { type: 'boost', by: 'student' } }, 5);
+      assert.ok(result.players.student.position > result.players.guide.position, `${studentScore}/${guideScore}`);
+      assert.ok(result.scores.student > result.scores.guide, `${studentScore}/${guideScore}`);
+      assert.equal(result.players.student.position, Math.min(14, result.scores.student / 5));
+      assert.equal(result.players.guide.position, Math.min(14, result.scores.guide / 5));
+    }
+  }
+});
+
+test('Quiz Go Back moves one city checkpoint back and updates score to match', () => {
+  const base = startedGame();
+  const g = { ...atPositions(base, 2, 4, { student: 0, guide: 12 }), earnedByStop: { student: {}, guide: { 4: 7 } } };
+  const back = completePlayerTurn({ ...g, punish: { type: 'back', by: 'student' } }, 5);
+  assert.equal(back.players.guide.position, 2);
+  assert.equal(back.scores.guide, 10);
+  assert.equal(back.earnedByStop.guide[4], 0);
+  assert.equal(back.backed.guide, true);
+  assert.deepEqual(back.backAnim, { player: 'guide', from: 2.4, to: 2 });
+});
+
+test('Quiz rewards apply at once and are spent: freeze, back, boost', () => {
   const base = startedGame();
   const pick = (type, g) => completePlayerTurn({ ...g, punish: { type, by: 'student' } }, 5);
-  const g = atPositions(base, 2, 4, { student: 0, guide: 12 });
+  const g = { ...atPositions(base, 2, 4, { student: 0, guide: 12 }), earnedByStop: { student: {}, guide: { 4: 2 } } };
   const frozen = pick('freeze', g);
   assert.equal(frozen.activePlayer, 'student');
   assert.deepEqual(frozen.rewardsUsed, { student: ['freeze'], guide: [] });
   assert.match(frozen.notice, /is frozen.*skips a turn/);
   const back = pick('back', g);
-  assert.equal(back.players.guide.position, 3);
+  assert.equal(back.players.guide.position, 2);
   assert.equal(back.scores.guide, 10);
-  assert.deepEqual(back.backAnim, { player: 'guide', from: 4, to: 3 });
+  assert.deepEqual(back.backAnim, { player: 'guide', from: 2.4, to: 2 });
   assert.equal(back.activePlayer, 'guide');
   assert.deepEqual(back.rewardsUsed.student, ['back']);
   const boost = pick('boost', g);
-  assert.equal(boost.players.student.position, 5);
-  assert.equal(boost.scores.student, 17);
+  assert.equal(boost.players.student.position, 4);
+  assert.equal(boost.scores.student, 20);
   assert.deepEqual(boost.rewardsUsed.student, ['boost']);
-  assert.deepEqual(boost.moveAnim, { player: 'student', from: 2, to: 5 });
-  assert.equal(pick('boost', { ...g, rewardsUsed: { student: ['boost'], guide: [] } }).players.student.position, 3);
+  assert.deepEqual(boost.moveAnim, { player: 'student', from: 0, to: 4 });
+  assert.equal(pick('boost', { ...g, rewardsUsed: { student: ['boost'], guide: [] } }).players.student.position, 1);
+  const ahead = pick('boost', atPositions(base, 6, 2, { student: 20, guide: 10 }));
+  assert.equal(ahead.players.student.position, 6);
+  assert.equal(ahead.scores.student, 30);
+  assert.match(ahead.notice, /Player 1 is now ahead with 30pts/);
+  const farBehind = pick('boost', atPositions(base, 2, 9, { student: 30, guide: 40 }));
+  assert.equal(farBehind.players.student.position, 9);
+  assert.equal(farBehind.scores.student, 45);
+  assert.deepEqual(punishOptions(atPositions(base, 6, 2, { student: 20, guide: 10 })), ['freeze', 'back', 'boost']);
 });
+
+test('resolved Quiz reward produces movement-slip feedback before the next preview', () => {
+  const base = startedGame();
+  const quizIndex = base.decks.student.findIndex(id => challengeById(id).lane === 'Quiz');
+  const quiz = challengeById(base.decks.student[quizIndex]);
+  const game = {
+    ...base,
+    selectedAnswer: quiz.correct,
+    quiz: { status: 'correct', message: 'Correct answer.', chosen: 'boost' },
+    punish: { type: 'boost', by: 'student' },
+    players: { ...base.players, student: { ...base.players.student, challengeIndex: quizIndex } }
+  };
+  const result = completePlayerTurn(game, 5);
+  assert.equal(result.playerPreview, true);
+  assert.ok(result.moveAnim);
+  assert.equal(result.movementFeedback.playerId, 'student');
+  assert.match(result.movementFeedback.message, /Player 1 earns 5 points/);
+  assert.match(result.movementFeedback.message, /Player 1 is now ahead with/);
+});
+
 test('a player sent back onto a Quiz stop gets a skill question there, not a Quiz', () => {
   const base = startedGame();
-  const quizAt = base.quizStops?.[0] ?? base.decks.quizStops[0];
+  const quizAt = base.quizStops?.guide?.[0] ?? base.decks.quizStops.guide[0];
   const g = atPositions(base, 1, quizAt + 1, { student: 0, guide: 5 });
   const back = completePlayerTurn({ ...g, punish: { type: 'back', by: 'student' } }, 5);
-  assert.equal(back.players.guide.position, quizAt);
+  assert.equal(back.players.guide.challengeIndex, quizAt + 1);
   const shown = currentChallenge({ ...back, activePlayer: 'guide' });
   assert.notEqual(shown.lane, 'Quiz');
 });

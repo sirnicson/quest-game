@@ -77,11 +77,11 @@ export function checkWritingLength(item, text) {
   return { words, ok: words >= item.minWords && words <= item.maxWords };
 }
 
-// Which verdicts the judge may give: 1-10 words RETRY, 11 to below the minimum RETRY/FAIR, minimum or more all three.
+// Empty writing has no verdict; 1-9 words allow RETRY, 10-19 allow FAIR, and 20+ also allow GOOD.
 export function writingVerdicts(item, text) {
   const words = wordCount(text);
   if (words === 0) return [];
-  if (words <= 10) return ['RETRY'];
+  if (words < 10) return ['RETRY'];
   if (words < item.minWords) return ['RETRY', 'FAIR'];
   return ['RETRY', 'FAIR', 'GOOD'];
 }

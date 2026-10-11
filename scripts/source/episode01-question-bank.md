@@ -442,7 +442,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR01 — Easy — Description
 
-**Task:** Write **25–35 words** describing a place you would like to visit.
+**Task:** Write **20–30 words** describing a place you would like to visit.
 
 **Controlled requirement:** Place\
 **Control:** Use at least two descriptive adjectives.
@@ -451,7 +451,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR02 — Easy — Personal Message
 
-**Task:** Write **30–40 words** to a friend explaining why you are excited about an upcoming journey.
+**Task:** Write **20–30 words** to a friend explaining why you are excited about an upcoming journey.
 
 **Controlled requirement:** Journey\
 **Control:** Use **because** to give a reason.
@@ -462,7 +462,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR03 — Medium — Comparison
 
-**Task:** Write **35–45 words** comparing travelling by train and travelling by car.
+**Task:** Write **20–30 words** comparing travelling by train and travelling by car.
 
 **Controlled requirement:** Comparison\
 **Control:** Use at least one comparative form.
@@ -471,7 +471,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR04 — Medium — Advice
 
-**Task:** Write **30–40 words** giving a traveller two pieces of advice before starting a long journey.
+**Task:** Write **20–30 words** giving a traveller two pieces of advice before starting a long journey.
 
 **Controlled requirement:** Advice\
 **Control:** Use **should** at least twice.
@@ -480,7 +480,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR05 — Medium — City Life
 
-**Task:** Write **40–50 words** explaining one change that could make a city easier to walk around.
+**Task:** Write **20–30 words** explaining one change that could make a city easier to walk around.
 
 **Controlled requirement:** Urban life\
 **Control:** Give one reason for your suggestion.
@@ -489,7 +489,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR06 — Medium — Environment
 
-**Task:** Write **40–50 words** explaining one way travellers can reduce waste during a journey.
+**Task:** Write **20–30 words** explaining one way travellers can reduce waste during a journey.
 
 **Controlled requirement:** Environment\
 **Control:** Use a modal verb such as **should** or **could**.
@@ -500,7 +500,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR07 — Hard — Problem Solving
 
-**Task:** Write **40–50 words** explaining what you would do if your transport was delayed and you might miss your next connection.
+**Task:** Write **20–30 words** explaining what you would do if your transport was delayed and you might miss your next connection.
 
 **Controlled requirement:** Problem solving\
 **Control:** Use an **if-clause**.
@@ -509,7 +509,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR08 — Hard — Culture
 
-**Task:** Write **45–55 words** explaining why visitors should learn something about the culture of a place before travelling there.
+**Task:** Write **20–30 words** explaining why visitors should learn something about the culture of a place before travelling there.
 
 **Controlled requirement:** Culture\
 **Control:** Give at least two reasons.
@@ -518,7 +518,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR09 — Hard — Experience
 
-**Task:** Write **50–60 words** about a memorable journey or trip you have taken.
+**Task:** Write **20–30 words** about a memorable journey or trip you have taken.
 
 **Controlled requirement:** Experience\
 **Control:** Use past-tense verbs.
@@ -527,7 +527,7 @@ If you could choose one skill to improve during this journey, what would it be a
 
 ### WR10 — Hard — Opinion
 
-**Task:** Write **50–60 words** explaining which part of a long journey you think would be most challenging and why.
+**Task:** Write **20–30 words** explaining which part of a long journey you think would be most challenging and why.
 
 **Controlled requirement:** Opinion\
 **Control:** State your opinion and support it with a reason.
