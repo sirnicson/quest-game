@@ -17,6 +17,7 @@
 - Keep the current audio clips and MeloTTS generation pipeline unchanged.
 - Changes are limited to Listening; do not modify Quiz, Speaking, Reading, Writing, general card layout, or global feedback.
 - Do not add or run tests unless requested; use the spec acceptance criteria as the implementation checklist.
+- Update existing Listening schema consumers when the data contract changes; do not create new test files.
 
 ## Review Focus
 
@@ -78,6 +79,17 @@
 - [ ] Manually walk through one online two-player Listening item and confirm both clients show matching per-gap values/status and finish the turn only after the active player’s response.
 
 **Ruling:** Include `scripts/rooms.mjs` in Task 3 because the room server currently drops all non-string action values; for `check-listening` only, forward at most three strings capped at 40 characters each. This is required for multiplayer gap arrays; if the limit is wrong, longer future Listening prompts could be truncated.
+
+### Task 4: Align existing Listening schema consumers
+
+**Files:**
+- Modify: `tests/listening.test.js` (update existing assertions and scalar submissions to the approved gap-array contract; do not add new test cases)
+- Modify: `scripts/build-episode01-bank.mjs`
+
+- [x] Update the existing Listening test cases to read per-gap accepted answers and prompt parts and to pass arrays for multi-gap and one-gap items.
+- [ ] Run Listening tests. (Not run unless the user requests tests.)
+- [x] Update the bank-generation cross-check to compare source accepted answers against the flattened accepted answers from every gap.
+- [ ] Run the bank-generation script. (Not run unless the user requests verification.)
 
 ## Completion checklist
 

@@ -70,7 +70,8 @@ for (const doc of listeningDoc) {
   if (!have) continue;
   expect(have.audioText.replace(/\s+/g, ' ') === doc.audioText.replace(/’/g, "'"), `${doc.id} transcript differs from the bank document`);
   const normalise = value => value.toLowerCase();
-  expect(doc.accepted.every(value => have.accepted.map(normalise).includes(normalise(value))), `${doc.id} accepted answers differ from the bank document`);
+  const bankAnswers = have.gaps.flatMap(gap => gap.accepted).map(normalise);
+  expect(doc.accepted.every(value => bankAnswers.includes(normalise(value))), `${doc.id} accepted answers differ from the bank document`);
 }
 if (problems.length) { console.error(problems.join('\n')); process.exit(1); }
 
