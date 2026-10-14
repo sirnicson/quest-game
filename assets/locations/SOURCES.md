@@ -7,3 +7,6 @@
 - Previous Manchester traffic clip by Anas Alfakhuri (Pexels 27833487) is archived under assets/locations/legacy.
 
 - Rejected replacement: Nottsflix Nottingham Station clip (Pexels 32837915), archived under legacy and not used for Manchester.
+
+- Episode 01, Location 03 (Glasgow): University of Glasgow video by Nick Hawkes, [Pexels](https://www.pexels.com/video/aerial-footage-of-university-glasgow-10200907/). Matching poster is from the same clip page.
+- University fact: [University of Glasgow](https://www.gla.ac.uk/schools/computing/worldchangerstogether/aboutglasgow/), founded in 1451 and fourth oldest in the English-speaking world.

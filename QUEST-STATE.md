@@ -70,10 +70,12 @@ QUEST is a browser English learning adventure for two players. Episode 01 follow
 ## Location media
 
 - London introduction is implemented using George Morina's Tower Bridge clip. Fact: Tower Bridge opened on 30 June 1894. It appears before the first player preview.
-- Manchester introduction uses David Pickup's aerial cathedral clip (Pexels 28871888) when the city is first reached. Caption: Manchester Cathedral has over 800 years of history, dating back to 1215. Previous traffic footage is archived under assets/locations/legacy.
+- Manchester introduction uses David Pickup's aerial cathedral clip (Pexels 28871888) before each player's question turn at that location. Caption: Manchester Cathedral has over 800 years of history, dating back to 1215. Previous traffic footage is archived under assets/locations/legacy.
 - The owner finalized Manchester Cathedral footage on 2026-10-14, replacing the previously discussed Town Hall option.
 - The rejected Nottingham Station clip is archived at assets/locations/legacy/nottingham-station-rejected-for-manchester.mp4. It is not referenced by the game.
-- Credits and source links are retained in assets/locations/SOURCES.md, without displaying them on the location card. The city introduction currently supports London and Manchester only; remaining cities await footage and facts.
+- Credits and source links are retained in assets/locations/SOURCES.md, without displaying them on the location card. The city introduction supports London, Manchester and Glasgow; remaining cities await footage and facts.
+
+- Glasgow introduction uses Nick Hawkes' University of Glasgow aerial clip (Pexels 10200907) before each player's question turn at that location, followed by the same player-preview transition. Fact: founded in 1451, fourth-oldest university in the English-speaking world, after Oxford, Cambridge and St Andrews.
 
 ## Episode previews
 
@@ -116,3 +118,6 @@ Each item needs a stable ID, skill/type, level and skill-specific answer/evaluat
 - Central five-level question banks, later episode content and final maps.
 - Browser review of route/camera smoothness, movement order, complete two-player journey, small screens and media transitions after merging.
 - Online recovery and clock synchronization as described above.
+
+### Location-video sequence correction (2026-10-14)
+Location videos play for the active player's question location at the start of every turn, including the second player and retries. They follow the previous turn's completed movement and score update. They are not triggered by the previous player arriving somewhere and are not suppressed after one shared viewing. London -> player preview -> question applies independently to both players. Currently available videos: London, Manchester and Glasgow.

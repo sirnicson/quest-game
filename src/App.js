@@ -1,3 +1,4 @@
+import { locationForTurn } from './screens/episodes/Episode01/LocationPreview.js';
 import { createInitialGame, reduceAction, completePlayerTurn, punishOptions, RETRY_REASONS } from './core/gameState.js';
 import { episodes } from './data/episodes/index.js';
 import { navigation } from './components/Navigation.js';
@@ -86,15 +87,12 @@ export function createApp(root) {
   function finishTurn(points){
     playGameMove(points > 0 ? 'correct' : 'incorrect');
     const owner=game.activePlayer;
-    const startingPosition=game.players[owner]?.position ?? 0;
     clearTimeout(turnTimer);
     const settle=()=>{
       if(game.screen!=='challenge' || game.activePlayer!==owner) return;
       const scoresBeforeTurn = { ...game.scores };
       const completedTurn=completePlayerTurn(game,points);
-      const destinationPosition=completedTurn.players[owner]?.position ?? startingPosition;
-      const firstManchesterArrival=startingPosition<1 && destinationPosition>=1 && !(completedTurn.locationStopsSeen ?? []).includes(1);
-      const locationStop=firstManchesterArrival ? 1 : null;
+      const locationStop=locationForTurn(completedTurn);
       game={...completedTurn,cardExiting:false,displayScores:scoresBeforeTurn};
       render();
       const moving = Boolean(game.moveAnim || game.backAnim);
@@ -118,12 +116,11 @@ export function createApp(root) {
           render();
           previewTimer = setTimeout(() => {
             if (game.screen !== 'challenge' || game.transitionPhase !== 'score') return;
-            if (locationStop !== null && !(game.locationStopsSeen ?? []).includes(locationStop)) {
+            if (locationStop !== null) {
               game = {
                 ...game,
                 locationPreview: true,
                 locationPreviewStop: locationStop,
-                locationStopsSeen: [...(game.locationStopsSeen ?? []), locationStop],
                 locationTransition: false,
                 playerPreview: false,
                 transitionPhase: null
@@ -422,7 +419,8 @@ export function createApp(root) {
       finishTimer = setTimeout(() => {
         if (finishKey !== nextFinishKey || game.finishCelebration?.player !== nextFinishKey.split(':')[0]) return;
         const showReport = Boolean(game.reportPending);
-        game = { ...game, finishCelebration: null, screen: showReport ? 'report' : 'challenge', playerPreview: !showReport };
+        const locationStop = showReport ? null : locationForTurn(game);
+        game = { ...game, finishCelebration: null, screen: showReport ? 'report' : 'challenge', locationPreview: locationStop !== null, locationPreviewStop: locationStop ?? 0, locationTransition: false, playerPreview: !showReport && locationStop === null };
         finishKey = null;
         finishTimer = null;
         render();

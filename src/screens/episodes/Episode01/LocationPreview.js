@@ -12,8 +12,23 @@ const LOCATIONS = {
     description: 'Manchester Cathedral has over 800 years of history, dating back to 1215.',
     video: 'manchester-cathedral',
     alt: 'Aerial view of Manchester Cathedral and the city skyline'
+  },
+  2: {
+    stop: '03',
+    name: 'Glasgow, Scotland',
+    description: 'Founded in 1451, the University of Glasgow is the fourth-oldest university in the English-speaking world, after Oxford, Cambridge and St Andrews.',
+    video: 'glasgow-university',
+    alt: 'Aerial footage of the University of Glasgow'
   }
 };
+
+// Match the stop used by the next player's question, including repeat turns.
+export function locationForTurn(game) {
+  const player = game.activePlayer;
+  if (game.completedPlayers?.[player]) return null;
+  const stop = Math.floor(game.players?.[player]?.position ?? 0);
+  return Object.hasOwn(LOCATIONS, stop) ? stop : null;
+}
 
 export function LocationPreview(stopIndex = 0) {
   const location = LOCATIONS[stopIndex] ?? LOCATIONS[0];
