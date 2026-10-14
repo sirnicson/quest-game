@@ -70,8 +70,8 @@ QUEST is a browser English learning adventure for two players. Episode 01 follow
 ## Location media
 
 - London introduction is implemented using George Morina's Tower Bridge clip. Fact: Tower Bridge opened on 30 June 1894. It appears before the first player preview.
-- Manchester introduction is implemented with Anas Alfakhuri's traffic clip when the city is first reached. It uses a descriptive caption rather than the proposed historic-building fact.
-- The owner selected Manchester Town Hall for the replacement. An approved downloadable video has not been supplied; embedding YouTube or obtaining the creator's reusable file were discussed but neither has been implemented.
+- Manchester introduction uses David Pickup's aerial cathedral clip (Pexels 28871888) when the city is first reached. Caption: Manchester Cathedral has over 800 years of history, dating back to 1215. Previous traffic footage is archived under assets/locations/legacy.
+- The owner finalized Manchester Cathedral footage on 2026-10-14, replacing the previously discussed Town Hall option.
 - The rejected Nottingham Station clip is archived at assets/locations/legacy/nottingham-station-rejected-for-manchester.mp4. It is not referenced by the game.
 - Credits and source links are retained in assets/locations/SOURCES.md, without displaying them on the location card. The city introduction currently supports London and Manchester only; remaining cities await footage and facts.
 
@@ -112,7 +112,7 @@ Each item needs a stable ID, skill/type, level and skill-specific answer/evaluat
 - GO BACK from a partial leg returns to a checkpoint, whereas automatic failed retry subtracts five route points. Keep that distinction visible; the owner's later fixed -5 annotation does not describe every partial Quiz setback.
 - Decide whether the 2-point position should remain proportional at 40% or be displayed at the exact midpoint.
 - Confirm whether timeout after one player has already finished should remain QUEST FAILED; current code fails unless both are complete.
-- Final Town Hall footage and fact; introductions for the remaining locations.
+- Introductions for the remaining locations.
 - Central five-level question banks, later episode content and final maps.
 - Browser review of route/camera smoothness, movement order, complete two-player journey, small screens and media transitions after merging.
 - Online recovery and clock synchronization as described above.

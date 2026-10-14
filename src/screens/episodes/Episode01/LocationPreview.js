@@ -9,9 +9,9 @@ const LOCATIONS = {
   1: {
     stop: '02',
     name: 'Manchester, England',
-    description: 'A busy street scene with buses and traffic.',
-    video: 'manchester-traffic',
-    alt: 'Buses and traffic moving along a Manchester street'
+    description: 'Manchester Cathedral has over 800 years of history, dating back to 1215.',
+    video: 'manchester-cathedral',
+    alt: 'Aerial view of Manchester Cathedral and the city skyline'
   }
 };
 
