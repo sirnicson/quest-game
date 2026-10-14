@@ -121,6 +121,7 @@ export function createApp(root) {
                 ...game,
                 locationPreview: true,
                 locationPreviewStop: locationStop,
+                locationStopsSeen: [...new Set([...(game.locationStopsSeen ?? []), locationStop])],
                 locationTransition: false,
                 playerPreview: false,
                 transitionPhase: null
@@ -420,7 +421,7 @@ export function createApp(root) {
         if (finishKey !== nextFinishKey || game.finishCelebration?.player !== nextFinishKey.split(':')[0]) return;
         const showReport = Boolean(game.reportPending);
         const locationStop = showReport ? null : locationForTurn(game);
-        game = { ...game, finishCelebration: null, screen: showReport ? 'report' : 'challenge', locationPreview: locationStop !== null, locationPreviewStop: locationStop ?? 0, locationTransition: false, playerPreview: !showReport && locationStop === null };
+        game = { ...game, finishCelebration: null, screen: showReport ? 'report' : 'challenge', locationPreview: locationStop !== null, locationPreviewStop: locationStop ?? 0, locationStopsSeen: locationStop === null ? game.locationStopsSeen : [...new Set([...(game.locationStopsSeen ?? []), locationStop])], locationTransition: false, playerPreview: !showReport && locationStop === null };
         finishKey = null;
         finishTimer = null;
         render();

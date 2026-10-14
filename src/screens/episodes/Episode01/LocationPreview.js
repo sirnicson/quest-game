@@ -22,12 +22,12 @@ const LOCATIONS = {
   }
 };
 
-// Match the stop used by the next player's question, including repeat turns.
+// Introduce each question location once for the shared game, on either player's first turn there.
 export function locationForTurn(game) {
   const player = game.activePlayer;
   if (game.completedPlayers?.[player]) return null;
   const stop = Math.floor(game.players?.[player]?.position ?? 0);
-  return Object.hasOwn(LOCATIONS, stop) ? stop : null;
+  return Object.hasOwn(LOCATIONS, stop) && !(game.locationStopsSeen ?? []).includes(stop) ? stop : null;
 }
 
 export function LocationPreview(stopIndex = 0) {
