@@ -3,22 +3,21 @@ export const otherEpisodes = [
     id: 2,
     title: 'THE ROAD TO THE EAST',
     start: { name: 'Istanbul, Turkey', lat: 41.0082, lon: 28.9784 },
-    bounds: { west: 20, east: 116, south: 4, north: 62 },
+    bounds: { west: 5, east: 158, south: -15, north: 62 },
     stops: [
-      { name: 'Delhi, India', lat: 28.6139, lon: 77.209, travel: 'FLIGHT TO INDIA' },
-      { name: 'Agra, India', lat: 27.1767, lon: 78.0081 },
-      { name: 'Varanasi, India', lat: 25.3176, lon: 82.9739 },
-      { name: 'Amritsar, India', lat: 31.634, lon: 74.8723 },
+      { name: 'Damascus, Syria', lat: 33.5138, lon: 36.2765 },
+      { name: 'Baghdad, Iraq', lat: 33.3152, lon: 44.3661 },
+      { name: 'Tehran, Iran', lat: 35.6892, lon: 51.3890 },
       { name: 'Kabul, Afghanistan', lat: 34.5553, lon: 69.2075 },
-      { name: 'Tashkent, Uzbekistan', lat: 41.2995, lon: 69.2401 },
-      { name: 'Samarkand, Uzbekistan', lat: 39.6542, lon: 66.9597 },
-      { name: 'Bukhara, Uzbekistan', lat: 39.7681, lon: 64.4556 },
-      { name: 'Almaty, Kazakhstan', lat: 43.2383, lon: 76.945 },
-      { name: 'Astana, Kazakhstan', lat: 51.1694, lon: 71.4491 },
-      { name: 'Novosibirsk, Russia', lat: 55.0084, lon: 82.9357 },
-      { name: 'Irkutsk, Russia', lat: 52.2864, lon: 104.2807 },
-      { name: 'Ulaanbaatar, Mongolia', lat: 47.9184, lon: 106.9177 },
-      { name: 'Hohhot, China', lat: 40.8426, lon: 111.7492 },
+      { name: 'Islamabad, Pakistan', lat: 33.6844, lon: 73.0479 },
+      { name: 'New Delhi, India', lat: 28.6139, lon: 77.2090 },
+      { name: 'Kathmandu, Nepal', lat: 27.7172, lon: 85.3240 },
+      { name: 'Dhaka, Bangladesh', lat: 23.8103, lon: 90.4125 },
+      { name: 'Bangkok, Thailand', lat: 13.7563, lon: 100.5018 },
+      { name: 'Hanoi, Vietnam', lat: 21.0278, lon: 105.8342 },
+      { name: 'Hong Kong', lat: 22.3193, lon: 114.1694 },
+      { name: 'Taipei', lat: 25.0330, lon: 121.5654 },
+      { name: 'Shanghai, China', lat: 31.2304, lon: 121.4737 },
       { name: 'Beijing, China', lat: 39.9042, lon: 116.4074 }
     ]
   },
@@ -66,6 +65,18 @@ export const otherEpisodes = [
       { name: 'Panama City, Panama', lat: 8.9824, lon: -79.5199 },
       { name: 'Bogotá, Colombia', lat: 4.711, lon: -74.0721 },
       { name: 'Rio de Janeiro, Brazil', lat: -22.9068, lon: -43.1729 }
+    ]
+  },
+  {
+    id: 5,
+    title: 'THE SANDS OF AFRICA',
+    start: { name: 'Brazil' },
+    stops: [
+      { name: 'West Africa' },
+      { name: 'Morocco' },
+      { name: 'Spain' },
+      { name: 'Portugal' },
+      { name: 'England' }
     ]
   }
 ];

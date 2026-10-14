@@ -1,5 +1,5 @@
 import { buildDecks, mulberry32 } from './deck.js';
-import { bankIds, challengeById } from './challengeBank.js';
+import { bankIds, challengeById, QUIZ_POINTS } from './challengeBank.js';
 import { currentChallenge, deckFor } from './challengeSelect.js';
 
 export const SCREENS = ['splash','proclamation','mission','setup','episode1Briefing','map','challenge','result','report'];
@@ -8,6 +8,7 @@ export const createInitialGame = () => ({
   screen: 'splash',
   history: [],
   previewEpisode: 1,
+  previewMode: false,
   timerSeconds: 3000,
   activeStop: 1,
   selectedAnswer: null,
@@ -22,7 +23,13 @@ export const createInitialGame = () => ({
   verdictReason: null,
   reasonPick: false,
   moveAnim: null,
+  backed: { student: false, guide: false },
   playerPreview: false,
+  locationPreview: false,
+  locationPreviewStop: 0,
+  locationStopsSeen: [],
+  locationTransition: false,
+  cardExiting: false,
   camera: 'overview',
   lastResult: null,
   fails: {},
@@ -30,16 +37,22 @@ export const createInitialGame = () => ({
   winner: null,
   notice: null,
   punish: null,
+  movementFeedback: null,
+  displayScores: null,
+  transitionPhase: null,
   rewardsUsed: { student: [], guide: [] },
   reached: 0,
   backAnim: null,
   activePlayer: 'student',
   completedPlayers: { student: false, guide: false },
+  earnedByStop: { student: {}, guide: {} },
+  finishCelebration: null,
+  reportPending: false,
   routeVisible: false,
   scores: { student: 0, guide: 0 },
   players: {
-    student: { position: 0, name: 'Player 1', avatar: '/assets/avatar%20new/batman.jpg' },
-    guide: { position: 0, name: 'Player 2', avatar: '/assets/avatar%20new/wonder%20woman.jpg' }
+    student: { position: 0, challengeIndex: 0, name: 'Player 1', avatar: '/assets/avatar%20new/batman.jpg' },
+    guide: { position: 0, challengeIndex: 0, name: 'Player 2', avatar: '/assets/avatar%20new/wonder%20woman.jpg' }
   }
 });
 
@@ -52,22 +65,40 @@ export const advanceScreen = (game) => {
   return goToScreen(game, SCREENS[Math.min(i + 1, SCREENS.length - 1)]);
 };
 
-export const applyMovement = (game, player, delta) => ({
+export const FINISHED = 14;
+export const routeProgress = score => Math.max(0, Math.min(FINISHED, Number(score ?? 0) / 5));
+
+const MAX_ROUTE_SCORE = FINISHED * 5;
+export const FINAL_QUESTION_POINTS = 5;
+export const WINNER_BONUS = 5;
+const MAX_TOTAL_SCORE = MAX_ROUTE_SCORE + FINAL_QUESTION_POINTS + WINNER_BONUS;
+const nextCheckpoint = score => Math.min(MAX_ROUTE_SCORE, (Math.floor(score / 5) + 1) * 5);
+export const scoreAfterAward = (score, points) => {
+  const current = Math.max(0, Math.min(MAX_TOTAL_SCORE, Number(score) || 0));
+  if (points < 0) return Math.max(0, current + points);
+  if (!(points > 0) || current >= MAX_ROUTE_SCORE) return current;
+  return Math.min(current + points, nextCheckpoint(current));
+};
+
+export const applyMovement = (game, player, delta) => {
+  const score = scoreAfterAward(game.scores?.[player] ?? 0, delta);
+  return {
   ...game,
+  scores: { ...game.scores, [player]: score },
   players: {
     ...game.players,
     [player]: {
       ...game.players[player],
-      position: Math.max(0, Math.min(15, game.players[player].position + delta))
+      position: routeProgress(score)
     }
   }
-});
+  };
+};
 
-export const FINISHED = 15;
-
-// A failed Quiz has already revealed its answer, so the retry is a fresh question of any skill
-// that is not in either deck and has not been used as a replacement yet.
-// With a room seed the pick is deterministic, so both browsers choose the same replacement question.
+// A failed Quiz is replaced in its current deck slot by a non-Quiz question.
+// Prefer an unscheduled question; if the bank has no spare cards, reuse a scheduled
+// non-Quiz question rather than exposing the failed Quiz again.
+// With a room seed the pick is deterministic, so both browsers choose the same replacement.
 function quizRetry(game, player, random = seededRandom(game, player)) {
   const seen = new Set(game.seenQuizzes ?? []);
   const shown = currentChallenge(game);
@@ -75,7 +106,10 @@ function quizRetry(game, player, random = seededRandom(game, player)) {
   seen.add(shown.id);
   const inDecks = new Set([...deckFor(game).student, ...deckFor(game).guide]);
   const used = new Set(Object.values(game.override ?? {}).filter(Boolean));
-  const pool = Object.values(bankIds).flat().filter(id => !inDecks.has(id) && !seen.has(id) && !used.has(id) && id !== shown.id);
+  const questions = Object.values(bankIds).flat().filter(id => challengeById(id)?.lane !== 'Quiz'
+    && !seen.has(id) && !used.has(id) && id !== shown.id);
+  const spareQuestions = questions.filter(id => !inDecks.has(id));
+  const pool = spareQuestions.length ? spareQuestions : questions;
   return { seen: [...seen], id: pool.length ? pool[Math.floor(random() * pool.length)] : null };
 }
 const other = player => player === 'student' ? 'guide' : 'student';
@@ -85,28 +119,17 @@ function seededRandom(game, player) {
   return mulberry32((game.seed + progress + (player === 'student' ? 1 : 2)) >>> 0);
 }
 
-export const WINNER_BONUS = 10;
-export const BACK_PENALTY = 2;
-export const RETRY_CAP = 3;
 export const RETRY_REASONS = ['SHORT', 'OFFTOPIC', 'UNCLEAR'];
-
-// True when the player is replaying a stop they already failed once, so points are capped at RETRY_CAP.
-export function isCappedRetry(game, player) {
-  const prior = game.fails?.[player];
-  const shown = currentChallenge(game);
-  return Boolean(prior && prior.stop === game.players[player].position && prior.count >= 1 && shown && shown.lane !== 'Quiz');
-}
 export const BOOST_POINTS = 5;
 export const REWARDS = ['freeze', 'back', 'boost'];
 
 // Rewards a player has already spent (each of the 3 can be used once per player per game).
 export const rewardsUsed = (game, player) => game.rewardsUsed?.[player] ?? [];
 
-// Boost only helps a player who is behind or tied with the other in position or score.
-const boostUseful = (game, victim) => {
-  const me = game.activePlayer || 'student';
-  return game.players[victim].position >= game.players[me].position || (game.scores?.[victim] ?? 0) >= (game.scores?.[me] ?? 0);
-};
+function quizBackWouldCreateScoreOrderInversion(game, points = QUIZ_POINTS) {
+  // Position is derived from score, so a score lead cannot be behind on the route.
+  return false;
+}
 
 // Rewards the Quiz winner can use now: unspent and actually effective. Unusable ones stay banked for a later Quiz.
 export function punishOptions(game) {
@@ -114,10 +137,12 @@ export function punishOptions(game) {
   const victim = other(me);
   const { position } = game.players[victim];
   const spent = rewardsUsed(game, me);
+  const meAtFinalStop = game.players[me].position >= FINISHED;
+  const victimFinished = Boolean(game.completedPlayers?.[victim]);
   const effective = {
-    freeze: position < FINISHED,
-    back: position > 0 && position < FINISHED,
-    boost: position < FINISHED && boostUseful(game, victim)
+    freeze: !victimFinished && !meAtFinalStop,
+    back: position > 0 && !victimFinished && !quizBackWouldCreateScoreOrderInversion(game),
+    boost: position < FINISHED && !meAtFinalStop
   };
   return REWARDS.filter(kind => !spent.includes(kind) && effective[kind]);
 }
@@ -135,69 +160,121 @@ function skillReplacement(game, player, seen) {
 export const completePlayerTurn = (game, rawPoints) => {
   const currentPlayer = game.activePlayer || 'student';
   const waiting = other(currentPlayer);
-  const shown = currentChallenge(game);
-  const points = isCappedRetry(game, currentPlayer) ? Math.min(rawPoints, RETRY_CAP) : rawPoints;
-  const advanced = points > 0;
+  const points = Math.max(0, Number(rawPoints) || 0);
   const name = player => game.players[player].name;
   const notices = [];
+  let quizEffectNotice = null;
   const from = game.players[currentPlayer].position;
+  const fromIndex = game.players[currentPlayer].challengeIndex ?? Math.floor(from);
+  const scores = { ...game.scores };
+  const scoreBeforeTurn = scores[currentPlayer] ?? 0;
+  const scoreAfterTurnAward = scoreAfterAward(scoreBeforeTurn, points);
+  const appliedPoints = scoreAfterTurnAward - scoreBeforeTurn;
+  const succeeded = points > 0;
+  const advanced = appliedPoints > 0;
   const players = {
     ...game.players,
-    [currentPlayer]: { ...game.players[currentPlayer], position: Math.min(FINISHED, from + (advanced ? 1 : 0)) }
+    [currentPlayer]: {
+      ...game.players[currentPlayer],
+      challengeIndex: fromIndex + (succeeded ? 1 : 0)
+    }
   };
-  const scores = { ...game.scores };
+  const earnedByStop = {
+    student: { ...(game.earnedByStop?.student ?? {}) },
+    guide: { ...(game.earnedByStop?.guide ?? {}) }
+  };
   const fails = { ...(game.fails ?? {}) };
   const frozen = { ...(game.frozen ?? {}) };
-  const done = player => players[player].position >= FINISHED;
+  const backed = { ...(game.backed ?? { student: false, guide: false }) };
+  const completedPlayers = { ...(game.completedPlayers ?? { student: false, guide: false }) };
+  const done = player => Boolean(completedPlayers[player]);
   let backAnim = null;
+  let scoreAfterBack = null;
+  let retryRegression = false;
+  let retryPointsLost = 0;
+  let rewardEffect = null;
   const rewardsSpent = { student: [...rewardsUsed(game, 'student')], guide: [...rewardsUsed(game, 'guide')] };
-  const sendBack = player => {
+  const sendBack = (player, oneStop = false) => {
     const at = players[player].position;
-    players[player] = { ...players[player], position: at - 1 };
-    backAnim = { player, from: at, to: at - 1 };
+    const lastAwardIndex = Math.max(0, (players[player].challengeIndex ?? 0));
+    const currentScore = Math.max(0, scores[player] ?? 0);
+    const previousCheckpoint = oneStop
+      ? Math.max(0, currentScore - 5)
+      : Math.max(0, (Math.ceil(currentScore / 5 - 1e-10) - 1) * 5);
+    const lost = currentScore - previousCheckpoint;
+    scores[player] = previousCheckpoint;
+    players[player] = { ...players[player], position: routeProgress(scores[player]) };
+    backAnim = { player, from: at, to: players[player].position };
+    backed[player] = true;
+    earnedByStop[player][lastAwardIndex] = 0;
+    return lost;
   };
 
-  if (advanced) {
+  if (succeeded) {
     fails[currentPlayer] = { stop: from, count: 0 };
-  } else if (shown?.lane !== 'Quiz') {
+    backed[currentPlayer] = false;
+    if (appliedPoints > 0) earnedByStop[currentPlayer][fromIndex + 1] = appliedPoints;
+  } else {
     const previous = fails[currentPlayer];
-    const count = previous && previous.stop === from ? previous.count + 1 : 1;
-    if (count >= 2 && from > 0) {
-      sendBack(currentPlayer);
-      fails[currentPlayer] = { stop: from - 1, count: 0 };
-      notices.push(`⏪ ${name(currentPlayer)} falls back 1 stop`);
+    const count = previous && previous.stop === fromIndex ? previous.count + 1 : 1;
+    if (count >= 2 && fromIndex > 0) {
+      retryRegression = true;
+      retryPointsLost = sendBack(currentPlayer, true);
+      fails[currentPlayer] = { stop: fromIndex, count: 0 };
+      notices.push(`${name(currentPlayer)} falls back 1 stop (−${retryPointsLost})`);
     } else {
-      fails[currentPlayer] = { stop: from, count };
+      fails[currentPlayer] = { stop: fromIndex, count };
     }
   }
 
-  const punish = advanced && game.punish?.by === currentPlayer ? game.punish.type : null;
+  const punish = succeeded && game.punish?.by === currentPlayer ? game.punish.type : null;
   if (punish && !done(waiting)) {
     if (punish === 'freeze') {
       frozen[waiting] = true;
+      rewardEffect = { playerId: waiting, type: 'freeze', pointsLost: 0 };
+      scoreAfterBack = { ...scores };
+      quizEffectNotice = `${name(currentPlayer)} freezes ${name(waiting)}`;
       notices.push(`❄ ${name(waiting)} is frozen`);
-    } else if (punish === 'back' && players[waiting].position > 0) {
-      sendBack(waiting);
-      const lost = Math.min(BACK_PENALTY, scores[waiting] ?? 0);
-      scores[waiting] = (scores[waiting] ?? 0) - lost;
-      notices.push(`⏪ ${name(waiting)} goes back 1 stop (−${lost})`);
+      rewardsSpent[currentPlayer].push(punish);
+    } else if (punish === 'back' && players[waiting].position > 0 && !quizBackWouldCreateScoreOrderInversion(game, points)) {
+      const lost = sendBack(waiting);
+      rewardEffect = { playerId: waiting, type: 'back', pointsLost: lost };
+      scoreAfterBack = { ...scores };
+      quizEffectNotice = `${name(currentPlayer)} sends ${name(waiting)} back`;
+      notices.push(`${name(waiting)} goes back 1 stop (−${lost})`);
+      rewardsSpent[currentPlayer].push(punish);
+    } else if (punish === 'back') {
+      notices.push('Go Back is unavailable because it would put the higher-scoring player behind');
     }
-    if (REWARDS.includes(punish) && punish !== 'boost') rewardsSpent[currentPlayer].push(punish);
   }
 
   let winner = game.winner ?? null;
-  scores[currentPlayer] = (scores[currentPlayer] ?? 0) + points;
+  if (backAnim?.player !== currentPlayer) scores[currentPlayer] = scoreAfterTurnAward;
+  players[currentPlayer] = { ...players[currentPlayer], position: routeProgress(scores[currentPlayer]) };
 
-  if (punish === 'boost' && advanced && !rewardsSpent[currentPlayer].includes('boost')) {
+  if (punish === 'boost' && succeeded && !rewardsSpent[currentPlayer].includes('boost')) {
     rewardsSpent[currentPlayer].push('boost');
-    const own = players[currentPlayer].position;
-    const spot = Math.min(FINISHED - 1, own + 2, Math.max(own, players[waiting].position) + 1);
-    if (spot > players[currentPlayer].position) players[currentPlayer] = { ...players[currentPlayer], position: spot };
-    scores[currentPlayer] = Math.max(scores[currentPlayer], scores[waiting] ?? 0) + BOOST_POINTS;
-    notices.push(`🚀 ${name(currentPlayer)} boosts ahead`);
+    const beforeBoost = scores[currentPlayer] ?? 0;
+    const wasAhead = scoreBeforeTurn > (game.scores[waiting] ?? 0);
+    const boostTarget = wasAhead ? beforeBoost + BOOST_POINTS : (scores[waiting] ?? 0) + BOOST_POINTS;
+    const boostDestination = Math.min(MAX_ROUTE_SCORE, boostTarget);
+    scores[currentPlayer] = Math.max(beforeBoost, boostDestination);
+    players[currentPlayer] = { ...players[currentPlayer], position: routeProgress(scores[currentPlayer]) };
+    const boostPoints = scores[currentPlayer] - beforeBoost;
+    rewardEffect = { playerId: currentPlayer, type: 'boost', pointsGained: boostPoints };
+    earnedByStop[currentPlayer][fromIndex + 1] = appliedPoints + boostPoints;
+    quizEffectNotice = `${name(currentPlayer)} goes ahead of ${name(waiting)}`;
+    notices.push(`${name(currentPlayer)} is now ahead with ${scores[currentPlayer]}pts`);
   }
 
-  if (!winner && done(currentPlayer)) {
+  const finishedAtTurnStart = from >= FINISHED && succeeded && Number(game.timerSeconds ?? 1) > 0 && game.screen !== 'report';
+  if (finishedAtTurnStart) {
+    completedPlayers[currentPlayer] = true;
+    scores[currentPlayer] += FINAL_QUESTION_POINTS;
+    earnedByStop[currentPlayer][FINISHED + 1] = FINAL_QUESTION_POINTS;
+  }
+  const firstFinisher = finishedAtTurnStart && !winner;
+  if (firstFinisher) {
     winner = currentPlayer;
     scores[currentPlayer] += WINNER_BONUS;
     notices.push(`🏁 ${name(currentPlayer)} finishes first +${WINNER_BONUS}`);
@@ -210,14 +287,25 @@ export const completePlayerTurn = (game, rawPoints) => {
     notices.push(`${name(waiting)} skips a turn`);
   }
   const bothDone = done('student') && done('guide');
+  const finishCelebration = finishedAtTurnStart
+    ? { player: currentPlayer, place: firstFinisher ? 'winner' : 'runner-up' }
+    : null;
   const reached = Math.max(game.reached ?? 0, players.student.position, players.guide.position);
   const routeVisible = Boolean(game.routeVisible || reached > 0);
-  const retryPick = advanced ? { seen: game.seenQuizzes ?? [], id: null } : quizRetry(game, currentPlayer);
+  const resultSummary = appliedPoints > 0
+    ? `${name(currentPlayer)} earns ${appliedPoints} ${appliedPoints === 1 ? 'point' : 'points'}.`
+    : finishedAtTurnStart
+      ? `${name(currentPlayer)} completes the final question.`
+      : `${name(currentPlayer)} retries with no points.`;
+  const movementFeedback = retryRegression
+    ? `Retry failed. Goes back 1 spot - ${retryPointsLost}pts`
+    : quizEffectNotice || resultSummary;
+  const retryPick = succeeded ? { seen: game.seenQuizzes ?? [], id: null } : quizRetry(game, currentPlayer);
   const override = { ...(game.override ?? {}), [currentPlayer]: retryPick.id };
   const seen = new Set(retryPick.seen);
   if (backAnim) {
     const moved = backAnim.player;
-    const deckId = deckFor(game)[moved][backAnim.to];
+      const deckId = deckFor(game)[moved][players[moved].challengeIndex];
     override[moved] = null;
     if (deckId && challengeById(deckId)?.lane === 'Quiz') {
       const id = skillReplacement({ ...game, override }, moved, seen);
@@ -234,16 +322,24 @@ export const completePlayerTurn = (game, rawPoints) => {
     players,
     fails,
     frozen,
+    backed,
     winner,
+    completedPlayers,
+    earnedByStop,
+    finishCelebration,
+    reportPending: bothDone,
     rewardsUsed: rewardsSpent,
     reached,
     backAnim,
+    scoreAfterBack,
+    rewardEffect,
     punish: null,
+    movementFeedback: { playerId: currentPlayer, message: movementFeedback },
     notice: notices.join(' ') || null,
-    retry: { ...(game.retry ?? {}), [currentPlayer]: !advanced && backAnim?.player !== currentPlayer, ...(backAnim ? { [backAnim.player]: false } : {}) },
+    retry: { ...(game.retry ?? {}), [currentPlayer]: !succeeded && backAnim?.player !== currentPlayer, ...(backAnim ? { [backAnim.player]: false } : {}) },
     retryReason: {
       ...(game.retryReason ?? {}),
-      [currentPlayer]: !advanced && backAnim?.player !== currentPlayer ? (game.verdictReason ?? null) : null,
+      [currentPlayer]: !succeeded && backAnim?.player !== currentPlayer ? (game.verdictReason ?? null) : null,
       ...(backAnim ? { [backAnim.player]: null } : {})
     },
     verdictReason: null,
@@ -255,13 +351,13 @@ export const completePlayerTurn = (game, rawPoints) => {
     quiz: null,
     writing: null,
     verdict: null,
-    playerPreview: !bothDone,
-    lastResult: advanced ? 'correct' : 'incorrect',
+    playerPreview: !bothDone && !finishCelebration,
+    lastResult: succeeded ? 'correct' : 'incorrect',
     activePlayer: nextPlayer,
     routeVisible,
-    screen: bothDone ? 'report' : 'challenge',
-    activeStop: Math.min(FINISHED, players[nextPlayer].position + 1),
-    camera: `stop:${Math.min(14, advanced ? players[currentPlayer].position : players[nextPlayer].position)}`
+    screen: 'challenge',
+      activeStop: Math.min(FINISHED, Math.floor(players[nextPlayer].position) + 1),
+    camera: `stop:${Math.min(14, Math.floor(advanced ? players[currentPlayer].position : players[nextPlayer].position))}`
   };
 };
 export const reduceAction = (game, action) => {
@@ -280,6 +376,12 @@ export const reduceAction = (game, action) => {
   if (typeof action === 'object' && action?.type === 'start-episode') {
     if (Number(action.episodeId) !== 1) return game;
     return goToScreen(game, 'map', {
+      timerSeconds: 3000,
+      previewMode: false,
+      players: {
+        student: { ...game.players.student, position: 0, challengeIndex: 0 },
+        guide: { ...game.players.guide, position: 0, challengeIndex: 0 }
+      },
       previewEpisode: 1,
       activeStop: 1,
       selectedAnswer: null,
@@ -289,6 +391,7 @@ export const reduceAction = (game, action) => {
       writing: null,
       verdict: null,
       moveAnim: null,
+      backed: { student: false, guide: false },
       retry: { student: false, guide: false },
       retryReason: { student: null, guide: null },
       verdictReason: null,
@@ -307,11 +410,19 @@ export const reduceAction = (game, action) => {
       reached: 0,
       backAnim: null,
       playerPreview: false,
+      locationPreview: false,
+      locationPreviewStop: 0,
+      locationStopsSeen: [],
+      locationTransition: false,
+      cardExiting: false,
       lastResult: null,
       camera: 'london',
       mapView: { scale: 1, x: 0, y: 0 },
       activePlayer: 'student',
       completedPlayers: { student: false, guide: false },
+      earnedByStop: { student: {}, guide: {} },
+      finishCelebration: null,
+      reportPending: false,
       routeVisible: false,
       scores: { student: 0, guide: 0 }
     });
@@ -321,6 +432,11 @@ export const reduceAction = (game, action) => {
     selectedAnswer: null,
     answerRevealed: false,
     playerPreview: true,
+    locationPreview: true,
+    locationPreviewStop: 0,
+    locationStopsSeen: [0],
+    locationTransition: false,
+    cardExiting: false,
     camera: 'london',
     activePlayer: game.activePlayer || 'student',
     completedPlayers: game.completedPlayers || { student: false, guide: false },

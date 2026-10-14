@@ -1,7 +1,7 @@
 import { avatarHtml } from '../../../data/avatars.js';
 import { button, escapeHtml, laneClass } from '../../../components/view.js';
 import { currentChallenge } from '../../../core/challengeSelect.js';
-import { punishOptions, rewardsUsed, isCappedRetry, RETRY_CAP } from '../../../core/gameState.js';
+import { punishOptions, rewardsUsed, scoreAfterAward } from '../../../core/gameState.js';
 import { checkWritingLength, writingVerdicts, POINTS } from '../../../core/challengeBank.js';
 
 const OTHER = { student: 'guide', guide: 'student' };
@@ -11,7 +11,7 @@ const retryChip = (game, retry) => {
   if (!retry) return '';
   const who = game.activePlayer || 'student';
   const reason = REASON_LABELS[game.retryReason?.[who]];
-  const parts = ['RETRY', reason, isCappedRetry(game, who) ? `MAX ${RETRY_CAP} PTS` : null].filter(Boolean);
+  const parts = ['RETRY', reason].filter(Boolean);
   return `<span class="retry-chip">${parts.join(' · ')}</span>`;
 };
 
@@ -30,8 +30,7 @@ const judgeButtons = (game, disabled = false, allowed = ['GOOD', 'FAIR', 'RETRY'
     const reasons = Object.entries(REASON_LABELS).map(([code, label]) => `<button type="button" class="btn danger" data-action="judge" data-points="RETRY:${code}">${label}</button>`).join('');
     return `<div class="teacher-tools speaking-scores retry-reasons" aria-label="Why retry?">${reasons}<button type="button" class="btn" data-action="judge-back" aria-label="Back to scores">←</button></div>`;
   }
-  const capped = isCappedRetry(game, game.activePlayer || 'student');
-  const pts = v => capped ? Math.min(POINTS[v], RETRY_CAP) : POINTS[v];
+  const pts = v => POINTS[v];
   return `<div class="teacher-tools speaking-scores" aria-label="Judge the response">
   <button type="button" class="btn success${pick('GOOD')}" data-action="judge" data-points="GOOD" ${off('GOOD')}>GOOD <span>${pts('GOOD')} PTS</span></button>
   <button type="button" class="btn fair${pick('FAIR')}" data-action="judge" data-points="FAIR" ${off('FAIR')}>FAIR <span>${pts('FAIR')} PTS</span></button>
@@ -42,8 +41,9 @@ const judgeButtons = (game, disabled = false, allowed = ['GOOD', 'FAIR', 'RETRY'
 const verdictLine = (game, who = null) => {
   const verdict = game.verdict;
   if (!verdict) return '';
-  const capped = isCappedRetry(game, game.activePlayer || 'student');
-  const pts = capped ? Math.min(POINTS[verdict], RETRY_CAP) : POINTS[verdict];
+  const playerId = game.activePlayer || 'student';
+  const scoreBefore = game.scores?.[playerId] ?? 0;
+  const pts = scoreAfterAward(scoreBefore, POINTS[verdict]) - scoreBefore;
   const reason = verdict === 'RETRY' && REASON_LABELS[game.verdictReason] ? ` · ${REASON_LABELS[game.verdictReason]}` : '';
   return `<p class="verdict-line ${verdict.toLowerCase()}" role="status">${who ? `${escapeHtml(who)} scored you ${verdict}` : verdict}${reason} · +${pts} PTS</p>`;
 };
@@ -52,20 +52,25 @@ function listeningCard(stop, game, player, retry) {
   const state = game.listening ?? {};
   const status = state.status;
   const locked = status === 'correct' || status === 'incorrect';
-  const fieldState = locked ? status : '';
   const feedback = state.message && status !== 'correct' && status !== 'incorrect' ? `<p class="listening-feedback ${status}" role="status">${escapeHtml(state.message)}</p>` : '';
   const playLabel = state.played ? '▶ REPLAY' : '▶ PLAY AUDIO';
+  const prompt = stop.listening.gaps.map((gap, index) => {
+    const part = stop.listening.promptParts[index] ?? '';
+    const value = state.values?.[index] ?? '';
+    const gapStatus = state.gapStatuses?.[index] ?? '';
+    const answerLength = Math.max(5, Math.min(20, Math.max(...gap.accepted.map(answer => answer.length))));
+    return `${escapeHtml(part)}<input id="listening-answer-${index}" class="listening-answer ${gapStatus}" type="text" data-listening-gap="${index}" data-gap="${index + 1}" size="${answerLength}" autocomplete="off" spellcheck="false" maxlength="40" aria-label="Answer ${index + 1}" value="${escapeHtml(value)}" ${state.played && !locked ? '' : 'disabled'}>`;
+  }).join('') + escapeHtml(stop.listening.promptParts.at(-1) ?? '');
   const { online, owner } = role(game);
   const watching = online && !owner;
   return `<aside class="challenge-card long-question listening-question">
     ${header(stop, game, player, retry)}
-    <p class="prompt">${escapeHtml(stop.prompt)}</p>
+    <p class="prompt listening-prompt">${prompt}</p>
     <div class="listening-player">
       <audio id="listening-audio" preload="auto" src="/${escapeHtml(stop.listening.audio)}"></audio>
       ${watching ? '' : `<button type="button" class="btn primary" data-action="play-listening" ${locked ? 'disabled' : ''}>${playLabel}</button>`}
-      <span class="listening-hint">${watching ? `${escapeHtml(player.name)} is listening…` : state.played ? 'Type your answer.' : 'Play the audio first.'}</span>
+      <span class="listening-hint">${watching ? `${escapeHtml(player.name)} is listening…` : state.played ? 'Type an answer in each blank.' : 'Play the audio first.'}</span>
     </div>
-    ${watching ? '' : `<input id="listening-answer" class="listening-answer ${fieldState}" type="text" autocomplete="off" spellcheck="false" maxlength="40" placeholder="Your answer" aria-label="Your answer" value="${escapeHtml(state.value ?? '')}" ${state.played && !locked ? '' : 'disabled'}>`}
     ${feedback}
     ${watching ? '' : `<div class="teacher-tools"><span>${locked ? '' : 'Missing word(s) only.'}</span>${button('CHECK ANSWER','check-listening','success').replace('class="btn', `${state.played && !locked ? '' : 'disabled '}class="btn`)}</div>`}
   </aside>`;
@@ -95,7 +100,7 @@ function readingCard(stop, game, player, retry) {
   const punishBtn = (kind, label) => `<button type="button" class="reward-tile ${spent.includes(kind) ? 'spent' : ''}" data-action="quiz-punish" data-points="${kind}" ${available.includes(kind) ? '' : 'disabled'}><i>${REWARD_ICON[kind]}</i><b>${label}</b>${spent.includes(kind) ? '<small>USED</small>' : ''}</button>`;
   const chosenLabel = PUNISH_LABELS[state.chosen];
   const footer = isQuiz && state.chosen
-    ? `<p class="judge-note quiz-verdict"><b>${chosenLabel}</b></p>`
+    ? `<p class="judge-note quiz-verdict"><b>${chosenLabel}</b></p>${game.quizEffectNotice ? `<p class="quiz-effect-feedback" role="status">${escapeHtml(game.quizEffectNotice)}</p>` : ''}`
     : isQuiz && state.choosing
     ? (online && !owner
       ? `<p class="judge-note">${escapeHtml(player.name)} is choosing…</p>`
@@ -174,7 +179,7 @@ export function Challenge(game) {
   const player = game.players[currentPlayer];
   const retry = Boolean(game.retry?.[currentPlayer]);
   if (game.playerPreview) {
-    return `<aside class="challenge-card player-preview"><div class="player-preview-identity"><span aria-hidden="true">${avatarHtml(player.avatar)}</span><strong>${escapeHtml(player.name.toUpperCase())}</strong></div>${game.notice ? `<p class="player-preview-notice">${escapeHtml(game.notice)}</p>` : ''}</aside>`;
+    return `<aside class="challenge-card player-preview"><div class="player-preview-identity"><span aria-hidden="true">${avatarHtml(player.avatar)}</span><strong>${escapeHtml(player.name.toUpperCase())}</strong></div></aside>`;
   }
   const stop = currentChallenge(game);
   if (!stop) return '';

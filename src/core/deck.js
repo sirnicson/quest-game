@@ -23,18 +23,19 @@ export function shuffle(list, random) {
 }
 
 // Orders a deck so the same skill never repeats back-to-back (retrying until it fits).
-function orderDeck(entries, random) {
+function orderDeck(entries, random, previousSkill = null) {
   for (let attempt = 0; attempt < 200; attempt++) {
     const order = shuffle(entries, random);
-    if (order.every((entry, i) => i === 0 || entry.skill !== order[i - 1].skill)) return order;
+    if ((previousSkill == null || order[0]?.skill !== previousSkill)
+      && order.every((entry, i) => i === 0 || entry.skill !== order[i - 1].skill)) return order;
   }
   return shuffle(entries, random);
 }
 
 export const QUIZ_STOPS = 3;
 
-// Quiz stops are random per game: stops 2-14 (never the first or last), never next to each other.
-// Returned as 0-based deck indices, shared by both players.
+// Quiz stops are randomized independently for each player: deck stops 2-14,
+// never the first or last, and never next to each other. Indices are 0-based.
 export function pickQuizStops(random, count = QUIZ_STOPS) {
   const candidates = Array.from({ length: 13 }, (_, i) => i + 1);
   for (let attempt = 0; attempt < 200; attempt++) {
@@ -44,21 +45,35 @@ export function pickQuizStops(random, count = QUIZ_STOPS) {
   return [2, 6, 10].slice(0, count);
 }
 
-// bank: { Skill: [ids] }. Each player draws 3 per skill; the two decks never share a question.
-// Both decks put their Quiz on the same random stops; every other stop holds a Reading/Speaking/Writing/Listening question.
+// bank: { Skill: [ids] }. The first 15 challenges have exactly 3 per skill;
+// remaining non-Quiz questions are split between players for longer score-based journeys.
 export function buildDecks(bank, seed = Date.now()) {
   const random = mulberry32(seed);
   const pools = Object.fromEntries(SKILLS.map(skill => [skill, shuffle(bank[skill], random)]));
-  const quizStops = pickQuizStops(random);
-  const draw = offset => {
+  const quizStops = {
+    student: pickQuizStops(random),
+    guide: pickQuizStops(random)
+  };
+  const draw = (offset, player) => {
     const rest = orderDeck(
       SKILLS.filter(skill => skill !== 'Quiz').flatMap(skill => pools[skill].slice(offset, offset + PER_SKILL).map(id => ({ id, skill }))),
       random
     ).map(entry => entry.id);
     const quizzes = pools.Quiz.slice(offset, offset + PER_SKILL);
     const deck = [];
-    for (let i = 0; i < 15; i++) deck.push(quizStops.includes(i) ? quizzes[quizStops.indexOf(i)] : rest.shift());
-    return deck;
+    const stops = quizStops[player];
+    for (let i = 0; i < 15; i++) deck.push(stops.includes(i) ? quizzes[stops.indexOf(i)] : rest.shift());
+    const used = new Set(deck);
+    const continuation = SKILLS.filter(skill => skill !== 'Quiz')
+      .flatMap(skill => pools[skill].filter(id => !used.has(id)).map(id => ({ id, skill })));
+    return [...deck, ...orderDeck(continuation, random, challengeByLane(deck.at(-1))).map(entry => entry.id)];
   };
-  return { student: draw(0), guide: draw(PER_SKILL), quizStops };
+  return { student: draw(0, 'student'), guide: draw(PER_SKILL, 'guide'), quizStops };
+}
+
+function challengeByLane(id) {
+  return id == null ? null : id.slice(0, 2) === 'QZ' ? 'Quiz'
+    : id.slice(0, 2) === 'RD' ? 'Reading'
+      : id.slice(0, 2) === 'SP' ? 'Speaking'
+        : id.slice(0, 2) === 'WR' ? 'Writing' : id.slice(0, 2) === 'LS' ? 'Listening' : null;
 }

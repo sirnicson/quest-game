@@ -124,7 +124,12 @@ export function createRoomStore({ now = Date.now } = {}) {
       const a = message?.a;
       if (typeof a !== "string" || !GAME_ACTIONS.has(a)) return { error: "bad-request" };
       const other = SEATS.find(s => s !== seat);
-      const data = JSON.stringify({ from: seat, a, s: message.s ?? null, v: typeof message.v === "string" ? message.v.slice(0, 4000) : null });
+      const value = typeof message.v === "string"
+        ? message.v.slice(0, 4000)
+        : a === "check-listening" && Array.isArray(message.v)
+          ? message.v.slice(0, 3).map(answer => typeof answer === "string" ? answer.slice(0, 40) : "")
+          : null;
+      const data = JSON.stringify({ from: seat, a, s: message.s ?? null, v: value });
       for (const send of room.seats[other]?.streams ?? []) send("act", data);
       room.touched = now();
       return { ok: true };

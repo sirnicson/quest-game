@@ -1,7 +1,7 @@
 import { HUD } from '../../../components/HUD.js';
-import { mapSvg } from '../../../components/GameMap.js';
+import { EpisodeMapPending } from '../../../components/EpisodeMapPending.js';
 
 export function Episode03({game, episode, episodes}) {
-  const map = mapSvg(episode, game);
+  const map = EpisodeMapPending({ episode });
   return `<section class="game screen"><div class="episode-preview-hud">${HUD(game, episode)}</div><div class="game-body"><div class="map-wrap"><nav class="episode-tabs" aria-label="Episode routes">${episodes.map(item=>`<button type="button" class="episode-tab ${item.id===episode.id?'active':''}" data-action="episode" data-stop="${item.id}"><span>0${item.id}</span><b>${item.title}</b></button>`).join('')}</nav><div class="map-heading"><span>CHAPTER 0${episode.id} · ${episode.id} OF 05</span><h1>EPISODE 0${episode.id} <i>·</i> ${episode.title}</h1><p>${episode.start.name} <b>→</b> ${episode.stops.at(-1).name}</p></div>${map}<ol class="route-milestones preview">${episode.stops.map((place,i)=>`<li><div class="route-milestone preview"><span>${String(i+1).padStart(2,'0')}</span><span class="milestone-name">${place.name}${place.travel ? `<small>${place.travel}</small>` : ''}</span></div></li>`).join('')}</ol></div><aside class="control episode-preview"><div class="eyebrow">EXPEDITION PREVIEW</div><h2>Episode 0${episode.id}</h2><h3>${episode.start.name}<br>to ${episode.stops.at(-1).name}</h3><p>This leg is mapped and ready for its future challenges.</p></aside></div></section>`;
 }

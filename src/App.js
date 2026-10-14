@@ -12,13 +12,19 @@ import { Episode03 } from './screens/episodes/Episode03/index.js';
 import { Episode04 } from './screens/episodes/Episode04/index.js';
 import { Episode05 } from './screens/episodes/Episode05/index.js';
 import { challenges as episode01Challenges } from './data/episodes/episode01Challenges.js';
-import { startAmbient, stopAmbient, fadeAmbient, startGameplay, stopGameplay, toggleAmbient, pauseGameplay, resumeGameplay, isSoundEnabled, playGameMove } from './core/audio.js';
-import { mapCameraPose } from './components/GameMap.js';
+import { startAmbient, stopAmbient, fadeAmbient, startGameplay, stopGameplay, toggleAmbient, pauseGameplay, resumeGameplay, isSoundEnabled, playGameMove, playFinishCelebration } from './core/audio.js';
+import { mapCameraPose, avatarPosition, routeDistance, ROUTE_LEGS } from './components/GameMap.js';
 import { currentChallenge } from './core/challengeSelect.js';
 import { checkListeningAnswer, LISTENING_POINTS } from './core/listeningEngine.js';
 import { checkQuizAnswer, checkReadingAnswer, checkWritingLength, writingVerdicts, POINTS } from './core/challengeBank.js';
 
 const TURN_FEEDBACK_MS = 1800;
+const CARD_EXIT_MS = 420;
+const CARD_FEEDBACK_GAP_MS = 120;
+const FEEDBACK_BEFORE_MOVE_MS = 360;
+const FEEDBACK_EXIT_MS = 260;
+const STILL_FEEDBACK_MS = 1000;
+const SCORE_UPDATE_MS = 450;
 const CAMERA_MS = 2400;
 const MOVE_MS = 4200;
 const BACK_MS = 2000;
@@ -31,92 +37,253 @@ export function createApp(root) {
   let timer = null;
   let previewTimer = null;
   let previewKey = null;
+  let locationTimer = null;
+  let locationKey = null;
   let mapDrag = null;
   let turnTimer = null;
+  let finishTimer = null;
+  let finishKey = null;
   let writingSync = null;
   let cameraFrame = null;
+  let cameraResolve = null;
   let recognition = null;
   const gameEpisodes = episodes.map(item => item.id===1 ? {...item, challenges: episode01Challenges} : item);
+
+  function preserveViewForFade(){
+    const current=root.querySelector('.app');
+    if(!current) return;
+    const snapshot=current.cloneNode(true);
+    snapshot.classList.add('screen-transition-snapshot');
+    snapshot.setAttribute('aria-hidden','true');
+    document.body.append(snapshot);
+    requestAnimationFrame(()=>snapshot.classList.add('is-fading'));
+    setTimeout(()=>snapshot.remove(),760);
+  }
+
+  function fadeLocationPreview(){
+    const current=root.querySelector('.location-preview-overlay');
+    if(!current) return;
+    const rect=current.getBoundingClientRect();
+    const snapshot=current.cloneNode(true);
+    snapshot.classList.add('location-preview-crossfade');
+    snapshot.setAttribute('aria-hidden','true');
+    Object.assign(snapshot.style,{
+      left:`${rect.left}px`,top:`${rect.top}px`,bottom:'auto',width:`${rect.width}px`
+    });
+    const video=snapshot.querySelector('video');
+    if(video){
+      video.pause();
+      video.removeAttribute('autoplay');
+      video.querySelectorAll('source').forEach(source=>source.remove());
+      video.removeAttribute('src');
+    }
+    document.body.append(snapshot);
+    requestAnimationFrame(()=>snapshot.classList.add('is-fading'));
+    setTimeout(()=>snapshot.remove(),650);
+  }
 
   // Shows the card's green/red feedback, then hands the turn to the other player.
   function finishTurn(points){
     playGameMove(points > 0 ? 'correct' : 'incorrect');
     const owner=game.activePlayer;
+    const startingPosition=game.players[owner]?.position ?? 0;
     clearTimeout(turnTimer);
-    turnTimer=setTimeout(()=>{
+    const settle=()=>{
       if(game.screen!=='challenge' || game.activePlayer!==owner) return;
-      game=completePlayerTurn(game,points);
+      const scoresBeforeTurn = { ...game.scores };
+      const completedTurn=completePlayerTurn(game,points);
+      const destinationPosition=completedTurn.players[owner]?.position ?? startingPosition;
+      const firstManchesterArrival=startingPosition<1 && destinationPosition>=1 && !(completedTurn.locationStopsSeen ?? []).includes(1);
+      const locationStop=firstManchesterArrival ? 1 : null;
+      game={...completedTurn,cardExiting:false,displayScores:scoresBeforeTurn};
       render();
       const moving = Boolean(game.moveAnim || game.backAnim);
-      const animation = runMoveAnimation();
-      if (moving) animation.then(() => {
-        if (game.screen !== 'challenge' || !game.playerPreview) return;
+      const finishTransition = () => {
+        previewTimer = null;
+        if (game.screen !== 'challenge') return;
+        if (game.finishCelebration) {
+          game = { ...game, moveAnim: null, backAnim: null, displayScores: null, movementFeedback: null, rewardEffect: null, scoreAfterBack: null, transitionPhase: null };
+          render();
+          return;
+        }
+        if (!game.playerPreview) return;
         const currentKey = `${game.activePlayer}:${game.players[game.activePlayer]?.position}`;
         if (currentKey !== previewKey) return;
-        game = { ...game, moveAnim: null, backAnim: null };
-        previewKey = null;
-        previewTimer = null;
+        game = { ...game, moveAnim: null, backAnim: null, displayScores: null, rewardEffect: null, scoreAfterBack: null, transitionPhase: 'feedback-exit' };
         render();
-      });
+        previewTimer = setTimeout(() => {
+          if (game.screen !== 'challenge' || game.transitionPhase !== 'feedback-exit') return;
+          game = { ...game, movementFeedback: null, transitionPhase: 'score' };
+          previewTimer = null;
+          render();
+          previewTimer = setTimeout(() => {
+            if (game.screen !== 'challenge' || game.transitionPhase !== 'score') return;
+            if (locationStop !== null && !(game.locationStopsSeen ?? []).includes(locationStop)) {
+              game = {
+                ...game,
+                locationPreview: true,
+                locationPreviewStop: locationStop,
+                locationStopsSeen: [...(game.locationStopsSeen ?? []), locationStop],
+                locationTransition: false,
+                playerPreview: false,
+                transitionPhase: null
+              };
+              previewKey = null;
+              previewTimer = null;
+              render();
+              return;
+            }
+            game = { ...game, transitionPhase: null };
+            previewKey = null;
+            previewTimer = null;
+            render();
+          }, SCORE_UPDATE_MS);
+        }, FEEDBACK_EXIT_MS);
+      };
+      if (moving) {
+        previewTimer = setTimeout(() => {
+          if (game.screen !== 'challenge' || !game.playerPreview) return;
+          previewTimer = null;
+          runMoveAnimation().then(finishTransition);
+        }, FEEDBACK_BEFORE_MOVE_MS);
+      }
+      else previewTimer = setTimeout(finishTransition, STILL_FEEDBACK_MS);
+    };
+    turnTimer=setTimeout(()=>{
+      if(game.screen!=='challenge' || game.activePlayer!==owner) return;
+      game={...game,cardExiting:true};
+      render();
+      turnTimer=setTimeout(settle,CARD_EXIT_MS + CARD_FEEDBACK_GAP_MS);
     },TURN_FEEDBACK_MS);
   }
 
-  // Cinematic move: the camera follows the mover while the avatar travels the new leg of the route.
-  function runMoveAnimation(){
+  // Show the affected player and penalty first, then follow the active player's move.
+  async function runMoveAnimation(){
     const anim=game.moveAnim;
-    animateMapTo(game.camera);
-    const backMotion=runBackAnimation();
-    if(!anim) return backMotion;
-    const legs=[];
-    for(let leg=anim.from;leg<anim.to;leg++){const path=root.querySelector(`#leg-${leg}`);if(path) legs.push(path);}
-    if(!legs.length) return backMotion;
-    const forwardMotion=new Promise(resolve=>{
+    const back=game.backAnim;
+    const effect=game.rewardEffect;
+    const finalCamera=game.camera;
+    if(back){
+      const setbackCamera=`stop:${Math.min(14,Math.floor(back.to))}`;
+      game={...game,camera:setbackCamera};
+      await runBackAnimation(setbackCamera);
+      game={...game,backAnim:null,displayScores:game.scoreAfterBack ?? game.scores,transitionPhase:'penalty',camera:finalCamera};
+      render();
+      if(effect?.type==='back') await new Promise(resolve=>setTimeout(resolve,SCORE_UPDATE_MS));
+    } else if(effect?.type==='freeze'){
+      const position=game.players[effect.playerId]?.position ?? 0;
+      const freezeCamera=`stop:${Math.min(14,Math.floor(position))}`;
+      game={...game,camera:freezeCamera};
+      await animateMapTo(freezeCamera);
+      await new Promise(resolve=>setTimeout(resolve,STILL_FEEDBACK_MS));
+    }
+    if(!anim) return;
+    game={...game,camera:finalCamera};
+    await animatePlayerRoute(anim,MOVE_MS * Math.max(1,Math.abs(anim.to-anim.from)),finalCamera);
+  }
+  function animatePlayerRoute(movement, duration, followCamera = null){
+    return new Promise(resolve=>{
+      const cameraFrom=followCamera ? (game.mapView || mapCameraPose(game.camera)) : null;
+      const cameraTo=followCamera ? mapCameraPose(followCamera) : null;
+      const world=followCamera ? root.querySelector('.map-world') : null;
+      const oldWorldTransition=world?.style.transition ?? '';
+      const initialPin=root.querySelector(`[data-pin="${movement.player}"]`);
+      const oldPinTransition=initialPin?.style.transition ?? '';
+      const routeMasks=Array.from({length:ROUTE_LEGS},(_,i)=>root.querySelector(`#route-mask-${movement.player}-${i} path`));
+      const pin=initialPin;
+      if(!pin){resolve();return;}
+      const sampleCount=Math.max(48,Math.ceil(duration/1000*48));
+      const frames=[];
+      for(let i=0;i<=sampleCount;i++){
+        const t=i/sampleCount;
+        const eased=ease(t);
+        const progress=Math.min(ROUTE_LEGS,movement.from+(movement.to-movement.from)*eased);
+        const point=avatarPosition(progress,movement.player);
+        let view=null;
+        if(cameraTo){
+          const scale=cameraFrom.scale+(cameraTo.scale-cameraFrom.scale)*eased;
+          const targetX=800-point.x*scale;
+          const targetY=460-point.y*scale;
+          const x=cameraFrom.x+(targetX-cameraFrom.x)*eased;
+          const y=cameraFrom.y+(targetY-cameraFrom.y)*eased;
+          view={scale,x,y};
+        }
+        frames.push({progress:routeDistance(progress),point,view});
+      }
+      if(world) world.style.transition='none';
+      pin.style.transition='none';
+      let previousComplete=Math.floor(frames[0].progress);
       const start=performance.now();
-      const step=now=>{
-        const pin=root.querySelector(`[data-pin="${anim.player}"]`);
-        if(!pin){resolve();return;}
-        const elapsed=Math.max(0,now-start);
-        const index=Math.min(legs.length-1,Math.floor(elapsed/MOVE_MS));
-        const t=Math.min(1,(elapsed-index*MOVE_MS)/MOVE_MS);
-        const path=legs[index];
-        const point=path.getPointAtLength(path.getTotalLength()*ease(t));
-        pin.setAttribute('transform',`translate(${(point.x+Number(pin.dataset.offset)).toFixed(1)} ${(point.y+12).toFixed(1)})`);
-        if(elapsed<legs.length*MOVE_MS) requestAnimationFrame(step);
-        else setTimeout(resolve,PIN_SETTLE_MS);
+      const updateRoute=now=>{
+        const t=Math.min(1,Math.max(0,(now-start)/duration));
+        const at=t*sampleCount;
+        const sample=Math.min(sampleCount-1,Math.floor(at));
+        const fraction=t>=1?1:at-sample;
+        const from=frames[sample];
+        const to=frames[Math.min(sampleCount,sample+1)];
+        const mix=(a,b)=>a+(b-a)*fraction;
+        const point={x:mix(from.point.x,to.point.x),y:mix(from.point.y,to.point.y)};
+        const routeProgress=mix(from.progress,to.progress);
+        pin.setAttribute('transform',`translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`);
+        if(world && from.view && to.view){
+          const view={scale:mix(from.view.scale,to.view.scale),x:mix(from.view.x,to.view.x),y:mix(from.view.y,to.view.y)};
+          world.setAttribute('transform',`translate(${view.x.toFixed(2)} ${view.y.toFixed(2)}) scale(${view.scale.toFixed(5)})`);
+          game.mapView=view;
+        }
+        const complete=Math.floor(routeProgress+1e-9);
+        if(complete!==previousComplete){
+          const first=Math.min(complete,previousComplete);
+          const last=Math.max(complete,previousComplete);
+          for(let i=first;i<last && i<ROUTE_LEGS;i++){
+            const path=routeMasks[i];
+            if(!path) continue;
+            const drawn=i<complete;
+            path.classList.toggle('drawn',drawn);
+            path.classList.toggle('partial',!drawn);
+            path.style.strokeDashoffset=drawn?'0':'100';
+          }
+          previousComplete=complete;
+        }
+        const activeLeg=Math.min(ROUTE_LEGS-1,complete);
+        const activePath=routeMasks[activeLeg];
+        if(activePath){
+          const fraction=Math.max(0,Math.min(1,routeProgress-activeLeg));
+          const completeLeg=fraction>=1-1e-9;
+          activePath.classList.toggle('drawn',completeLeg);
+          activePath.classList.toggle('partial',!completeLeg);
+          activePath.style.strokeDashoffset=String(completeLeg?0:(1-fraction)*100);
+        }
+        if(t<1) requestAnimationFrame(updateRoute);
+        else {
+          const final=frames.at(-1);
+          pin.setAttribute('transform',`translate(${final.point.x.toFixed(2)} ${final.point.y.toFixed(2)})`);
+          if(world && final.view){
+            world.setAttribute('transform',`translate(${final.view.x.toFixed(2)} ${final.view.y.toFixed(2)}) scale(${final.view.scale.toFixed(5)})`);
+            world.style.transition=oldWorldTransition;
+            game.mapView=final.view;
+          }
+          pin.style.transition=oldPinTransition;
+          setTimeout(resolve,PIN_SETTLE_MS);
+        }
       };
-      requestAnimationFrame(step);
+      requestAnimationFrame(updateRoute);
     });
-    return Promise.all([forwardMotion,backMotion]).then(()=>undefined);
   }
   // A setback: the affected avatar walks back along the leg it last travelled.
-  function runBackAnimation(){
+  function runBackAnimation(camera){
     const back=game.backAnim;
     if(!back) return Promise.resolve();
-    const path=root.querySelector(`#leg-${back.from-1}`);
-    if(!path) return Promise.resolve();
-    const length=path.getTotalLength();
-    return new Promise(resolve=>{
-      const start=performance.now();
-      const step=now=>{
-        const pin=root.querySelector(`[data-pin="${back.player}"]`);
-        if(!pin){resolve();return;}
-        const t=Math.min(1,Math.max(0,now-start)/BACK_MS);
-        const point=path.getPointAtLength(length*(1-ease(t)));
-        pin.setAttribute('transform',`translate(${(point.x+Number(pin.dataset.offset)).toFixed(1)} ${(point.y+12).toFixed(1)})`);
-        if(t<1) requestAnimationFrame(step);
-        else setTimeout(resolve,PIN_SETTLE_MS);
-      };
-      requestAnimationFrame(step);
-    });
+    return animatePlayerRoute(back,BACK_MS,camera);
   }
 
-  // Audio that finishes (or cannot load) unlocks the answer field, keeping any text already typed.
+  // Audio that finishes (or cannot load) unlocks every gap, keeping text already entered.
   function markListeningPlayed(){
     if(game.screen!=='challenge' || game.listening?.played) return;
-    const input=root.querySelector('#listening-answer');
-    game={...game,listening:{...game.listening,played:true,value:input?.value ?? ''}};
+    const inputs=Array.from(root.querySelectorAll('[data-listening-gap]'));
+    const values=inputs.length ? inputs.map(input=>input.value) : (game.listening?.values ?? []);
+    game={...game,listening:{...game.listening,played:true,values}};
     render();
-    root.querySelector('#listening-answer')?.focus();
+    root.querySelector('[data-listening-gap="0"]')?.focus();
   }
 
   function formatTime(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
@@ -142,19 +309,24 @@ export function createApp(root) {
     const target = mapCameraPose(camera);
     const from = game.mapView || mapCameraPose('overview');
     cancelAnimationFrame(cameraFrame);
-    const start = performance.now();
-    const step = now => {
-      if (!root.querySelector('.map-world')) return;
-      const e = ease(Math.min(1, (now - start) / CAMERA_MS));
-      game.mapView = {
-        scale: from.scale + (target.scale - from.scale) * e,
-        x: from.x + (target.x - from.x) * e,
-        y: from.y + (target.y - from.y) * e
+    cameraResolve?.();
+    return new Promise(resolve=>{
+      cameraResolve=resolve;
+      const start = performance.now();
+      const step = now => {
+        if (!root.querySelector('.map-world')) { cameraResolve=null; resolve(); return; }
+        const e = ease(Math.min(1, (now - start) / CAMERA_MS));
+        game.mapView = {
+          scale: from.scale + (target.scale - from.scale) * e,
+          x: from.x + (target.x - from.x) * e,
+          y: from.y + (target.y - from.y) * e
+        };
+        applyMapView(game.mapView);
+        if (e < 1) cameraFrame = requestAnimationFrame(step);
+        else { cameraResolve=null; resolve(); }
       };
-      applyMapView(game.mapView);
-      if (e < 1) cameraFrame = requestAnimationFrame(step);
-    };
-    cameraFrame = requestAnimationFrame(step);
+      cameraFrame = requestAnimationFrame(step);
+    });
   }
 
 
@@ -191,7 +363,29 @@ export function createApp(root) {
   }
 
   function render(){
-    const shouldPreview = game.screen === 'challenge' && game.playerPreview;
+    const nextLocationKey = game.screen === 'challenge' && game.locationPreview ? `location-${game.locationPreviewStop ?? 0}` : null;
+    if (nextLocationKey !== locationKey) {
+      clearTimeout(locationTimer);
+      locationTimer = null;
+      locationKey = nextLocationKey;
+      if (nextLocationKey) {
+        locationTimer = setTimeout(() => {
+          if (locationKey !== nextLocationKey || game.screen !== 'challenge' || !game.locationPreview) return;
+          fadeLocationPreview();
+          game = { ...game, locationPreview: false, locationTransition: true, playerPreview: false };
+          locationKey = null;
+          locationTimer = null;
+          render();
+          locationTimer = setTimeout(() => {
+            if (game.screen !== 'challenge' || !game.locationTransition) return;
+            game = { ...game, locationTransition: false, playerPreview: true };
+            locationTimer = null;
+            render();
+          }, 500);
+        }, 7000);
+      }
+    }
+    const shouldPreview = game.screen === 'challenge' && game.playerPreview && !game.finishCelebration && !game.locationPreview;
     const nextPreviewKey = shouldPreview
       ? `${game.activePlayer}:${game.players[game.activePlayer]?.position}`
       : null;
@@ -199,13 +393,13 @@ export function createApp(root) {
       clearTimeout(previewTimer);
       previewTimer = null;
       previewKey = nextPreviewKey;
-      if (nextPreviewKey && !game.moveAnim && !game.backAnim) {
-        const previewDuration = game.notice ? 3800 : 1600;
+      if (nextPreviewKey && !game.moveAnim && !game.backAnim && !game.movementFeedback && game.transitionPhase !== 'score') {
+        const previewDuration = 2000;
         previewTimer = setTimeout(() => {
           if (game.screen !== 'challenge' || !game.playerPreview) return;
           const currentKey = `${game.activePlayer}:${game.players[game.activePlayer]?.position}`;
           if (currentKey !== nextPreviewKey) return;
-          const nextStop = Math.min(14, game.players[game.activePlayer].position);
+          const nextStop = Math.min(14, Math.floor(game.players[game.activePlayer].position));
           game = { ...game, playerPreview: false, moveAnim: null, backAnim: null, camera: `stop:${nextStop}` };
           previewKey = null;
           previewTimer = null;
@@ -213,6 +407,26 @@ export function createApp(root) {
           animateMapTo(game.camera);
         }, previewDuration);
       }
+    }
+    const nextFinishKey = game.screen === 'challenge' && game.finishCelebration
+      ? `${game.finishCelebration.player}:${game.finishCelebration.place}`
+      : null;
+    if (nextFinishKey !== finishKey) {
+      clearTimeout(finishTimer);
+      finishTimer = null;
+      finishKey = nextFinishKey;
+    }
+    if (nextFinishKey && !finishTimer && !game.moveAnim && !game.backAnim) {
+      if (game.finishCelebration.place === 'winner') playFinishCelebration();
+      const duration = game.finishCelebration.place === 'winner' ? 5200 : 3600;
+      finishTimer = setTimeout(() => {
+        if (finishKey !== nextFinishKey || game.finishCelebration?.player !== nextFinishKey.split(':')[0]) return;
+        const showReport = Boolean(game.reportPending);
+        game = { ...game, finishCelebration: null, screen: showReport ? 'report' : 'challenge', playerPreview: !showReport };
+        finishKey = null;
+        finishTimer = null;
+        render();
+      }, duration);
     }
     const gameScreen=['map','challenge','result','report'].includes(game.screen);
     const listeningOpen=game.screen==='challenge' && !game.playerPreview && currentChallenge(game)?.listening
@@ -313,6 +527,7 @@ export function createApp(root) {
   }
 
   function startEpisode(seed){
+    preserveViewForFade();
     fadeAmbient(1200).then(()=>startGameplay());
     game=reduceAction(game,{type:'start-episode',episodeId:1,seed});
     startTimer(); render(); animateMapTo('london');
@@ -353,7 +568,7 @@ export function createApp(root) {
     if(net && SYNCED.has(actionName) && !remote){
       const owner=game.activePlayer===net.seat;
       if(JUDGE_ACTIONS.has(actionName)===owner) return;
-      if(actionName==='check-listening') extra=root.querySelector('#listening-answer')?.value ?? '';
+      if(actionName==='check-listening') extra=Array.from(root.querySelectorAll('[data-listening-gap]'),input=>input.value);
       if(actionName==='submit-writing') extra=root.querySelector('#writing-text')?.value ?? game.writing?.value ?? '';
       sendAct(session,{a:actionName,s:stopId ?? null,v:extra ?? null});
     }
@@ -362,16 +577,25 @@ export function createApp(root) {
     if(actionName==='cancel-room'){ leaveRoom(); setLobby({mode:'choose',error:null}); return; }
     if(actionName==='copy-link'){ copyText(lobby.link).then(ok=>setLobby({copied:ok})); return; }
     if(actionName==='episode'){
-      game={...game,previewEpisode:Math.max(1,Math.min(5,Number(stopId)||1)),screen:'map'};
-      if(game.previewEpisode===1) startTimer(); else stopTimer();
+      game={...game,previewEpisode:Math.max(1,Math.min(5,Number(stopId)||1)),previewMode:true,screen:'map'};
+      stopTimer();
       render(); return;
     }
+    if(actionName==='replay-episode'){
+      clearTimeout(finishTimer); finishTimer=null; finishKey=null;
+      clearTimeout(previewTimer); previewTimer=null; previewKey=null;
+      clearTimeout(locationTimer); locationTimer=null; locationKey=null;
+      startEpisode(Date.now());
+      return;
+    }
     if(actionName==='home-reset'){
+      clearTimeout(locationTimer); locationTimer=null; locationKey=null;
       stopTimer(); stopGameplay(); stopAmbient(); leaveRoom(); lobby={mode:'choose'}; game=reduceAction(game,'home-reset'); render(); return;
     }
     if(actionName==='back'){
+      clearTimeout(locationTimer); locationTimer=null; locationKey=null;
       if(['map','challenge','result','report'].includes(game.screen)) { stopGameplay(); startAmbient(); }
-      game=reduceAction(game,'back');
+      game={...reduceAction(game,'back'),locationPreview:false,locationTransition:false};
       if(['map','challenge','result'].includes(game.screen)) startTimer(); else stopTimer();
       render(); return;
     }
@@ -482,14 +706,18 @@ export function createApp(root) {
     }
     if(actionName==='check-listening'){
       const challenge=currentChallenge(game);
-      const input=root.querySelector('#listening-answer');
-      if(!challenge?.listening || (!input && extra===undefined) || game.listening?.status==='correct' || game.listening?.status==='incorrect') return;
-      const value=extra ?? input.value;
-      const result=checkListeningAnswer(challenge.listening,value);
-      game={...game,listening:{played:true,value,status:result.status,message:result.message}};
+      const inputs=Array.from(root.querySelectorAll('[data-listening-gap]'));
+      if(!challenge?.listening || (!inputs.length && extra===undefined) || game.listening?.status==='correct' || game.listening?.status==='incorrect') return;
+      const values=extra ?? inputs.map(input=>input.value);
+      const result=checkListeningAnswer(challenge.listening,values);
+      game={...game,listening:{played:true,values:result.values,gapStatuses:result.gapStatuses,status:result.status,message:result.message}};
       const finished=result.status==='correct' || result.status==='incorrect';
       render();
-      if(!finished){root.querySelector('#listening-answer')?.focus();return;}
+      if(!finished){
+        const retryIndex=result.gapStatuses.findIndex(gapStatus=>gapStatus==='empty' || gapStatus==='over-limit');
+        root.querySelector(`[data-listening-gap="${Math.max(0,retryIndex)}"]`)?.focus();
+        return;
+      }
       finishTurn(result.status==='correct'?LISTENING_POINTS:0);
       return;
     }
@@ -529,7 +757,7 @@ export function createApp(root) {
     }
   });
   root.addEventListener('keydown', event => {
-    if(event.key==='Enter' && event.target.id==='listening-answer'){event.preventDefault();dispatch('check-listening');return;}
+    if(event.key==='Enter' && event.target.matches?.('[data-listening-gap]')){event.preventDefault();dispatch('check-listening');return;}
     const target=event.target.closest('[data-action="stop"],[data-action="start-challenge"]');
     if(!target || !['Enter',' '].includes(event.key)) return;
     event.preventDefault(); dispatch(target.dataset.action,target.dataset.stop);

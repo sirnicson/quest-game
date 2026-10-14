@@ -1,6 +1,6 @@
 import { listeningBank } from '../data/episodes/listeningBank.js';
 
-// Maximum number of typed words allowed for each answer type.
+// Maximum number of typed words allowed for each gap answer type.
 export const WORD_LIMITS = {
   one_word: 1,
   number: 1,
@@ -44,30 +44,52 @@ const withoutUnits = tokens => tokens.filter(token => !isUnit(token));
 // Unit words ("minutes", "hours") are not counted against the word limit.
 export const countWords = value => withoutUnits(canonicalTokens(value)).length || (canonicalTokens(value).length ? 1 : 0);
 
-// status: empty | over-limit | correct | incorrect. Only correct/incorrect finish the player's turn.
-export function checkListeningAnswer(item, input) {
-  const limit = WORD_LIMITS[item.answerType] ?? 1;
-  const words = countWords(input);
-  if (!words) return { status: 'empty', words, limit, message: 'Type your answer first.' };
-  if (words > limit) {
-    return { status: 'over-limit', words, limit, message: `Too many words — use no more than ${limit}.` };
-  }
-  const given = canonicalTokens(input);
-  const same = (a, b) => a.length === b.length && a.every((token, i) => token === b[i]);
-  const correct = item.accepted.some(answer => {
+const tokensMatch = (target, given) =>
+  target.length === given.length && target.every((token, i) => token === given[i]);
+
+function checkGapAnswer(gap, input) {
+  const value = String(input ?? '');
+  const limit = WORD_LIMITS[gap.answerType] ?? 1;
+  const words = countWords(value);
+  if (!words) return { status: 'empty', value, words, limit };
+  if (words > limit) return { status: 'over-limit', value, words, limit };
+  const given = canonicalTokens(value);
+  const correct = gap.accepted.some(answer => {
     const target = canonicalTokens(answer);
-    return same(target, given) || same(withoutUnits(target), withoutUnits(given));
+    return tokensMatch(target, given) || tokensMatch(withoutUnits(target), withoutUnits(given));
   });
-  return correct
-    ? { status: 'correct', words, limit, message: 'Correct!' }
-    : { status: 'incorrect', words, limit, message: 'Not quite. Try again on your next turn.' };
+  return { status: correct ? 'correct' : 'incorrect', value, words, limit };
+}
+
+// status: empty | over-limit | correct | incorrect. Only complete answer sets
+// (correct or incorrect) finish the player's turn.
+export function checkListeningAnswer(item, inputs = []) {
+  const values = Array.isArray(inputs) ? inputs : [inputs];
+  const gapResults = item.gaps.map((gap, index) => checkGapAnswer(gap, values[index]));
+  const gapStatuses = gapResults.map(result => result.status);
+  const retryResult = gapResults.find(result => result.status === 'empty')
+    ?? gapResults.find(result => result.status === 'over-limit');
+  if (retryResult) {
+    const status = retryResult.status;
+    const message = status === 'empty'
+      ? 'Type an answer in each blank.'
+      : `Too many words — use no more than ${retryResult.limit} in that blank.`;
+    return { status, gapStatuses, values: gapResults.map(result => result.value), message };
+  }
+  const correct = gapStatuses.every(status => status === 'correct');
+  return {
+    status: correct ? 'correct' : 'incorrect',
+    gapStatuses,
+    values: gapResults.map(result => result.value),
+    message: correct ? 'Correct!' : 'Not quite. Try again on your next turn.'
+  };
 }
 
 // Builds a challenge object for the path, in the same shape as the other lanes.
 export function listeningChallenge(id) {
   const entry = getListeningItem(id);
   if (!entry) throw new Error(`Unknown listening item: ${id}`);
-  return { id: entry.id, lane: 'Listening', icon: '🎧', title: entry.topic, prompt: entry.prompt, listening: entry, move: 1 };
+  return { id: entry.id, lane: 'Listening', icon: '🎧', title: entry.topic, promptParts: entry.promptParts, listening: entry, move: 1 };
 }
 
 // Picks a random unused item so repeat games do not replay the same clips.

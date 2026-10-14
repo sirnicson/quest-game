@@ -24,10 +24,42 @@ export function shuffledChallenge(item, seed) {
   return { ...item, options: order.map(i => item.options[i]), [key]: order.indexOf(item[key]) };
 }
 
+function boundaryReplacement(game, player, index) {
+  const decks = deckFor(game);
+  const scheduled = new Set([...decks.student, ...decks.guide]);
+  const alreadyUsed = new Set([
+    ...Object.values(game.override ?? {}).filter(Boolean),
+    ...(game.seenQuizzes ?? [])
+  ]);
+  const pool = Object.values(bankIds).flat().filter(candidate =>
+    challengeById(candidate)?.lane !== 'Quiz' && !scheduled.has(candidate) && !alreadyUsed.has(candidate)
+  );
+  if (!pool.length) return null;
+  const random = mulberry32((Number(game.seed ?? game.optionSeed ?? 0) + hashId(`${player}:route-boundary:${index}`)) >>> 0);
+  return pool[Math.floor(random() * pool.length)];
+}
+
 // Challenge owned by the active player at their current spot; null once they have finished.
 export function currentChallenge(game) {
   const player = game.activePlayer || 'student';
   const deck = deckFor(game)[player];
-  const id = game.override?.[player] ?? deck[game.players[player].position];
-  return id ? shuffledChallenge(challengeById(id), game.optionSeed ?? game.seed) : null;
+  const index = game.players[player].challengeIndex ?? game.players[player].position;
+  let id = game.override?.[player] ?? deck[index];
+  if (!id && index >= deck.length) {
+    const previous = challengeById(deck.at(-1))?.lane;
+    const pool = Object.values(bankIds).flat()
+      .filter(candidate => challengeById(candidate)?.lane !== 'Quiz'
+        && challengeById(candidate)?.lane !== previous);
+    const random = mulberry32((Number(game.seed ?? game.optionSeed ?? 0) + hashId(`${player}:${index}`)) >>> 0);
+    id = pool[Math.floor(random() * pool.length)];
+  }
+  let challenge = id ? challengeById(id) : null;
+  const position = Number(game.players[player].position ?? 0);
+  // Quiz slots are scheduled by question index, but Boost and Go Back move the
+  // score-based avatar independently. Keep the first and final map stops non-Quiz.
+  if (challenge?.lane === 'Quiz' && (position <= 0 || position >= 14)) {
+    id = boundaryReplacement(game, player, index);
+    challenge = id ? challengeById(id) : null;
+  }
+  return challenge ? shuffledChallenge(challenge, game.optionSeed ?? game.seed) : null;
 }
