@@ -3,6 +3,31 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { Finish } from '../src/screens/episodes/Episode01/Finish.js';
 import { FinishCelebration } from '../src/screens/episodes/Episode01/FinishCelebration.js';
+import { Episode02 } from '../src/screens/episodes/Episode02/index.js';
+import { otherEpisodes } from '../src/data/episodes/otherEpisodes.js';
+
+test('Episode 02 preview uses the supplied Asia map and finalized Istanbul-to-Beijing route', async () => {
+  const episode = otherEpisodes.find(item => item.id === 2);
+  const game = { activePlayer: 'student', players: {
+    student: { name: 'Player 1', avatar: 'ðŸ§—', position: 0 },
+    guide: { name: 'Player 2', avatar: 'ðŸ§—', position: 0 }
+  } };
+  const html = Episode02({ game, episode, episodes: otherEpisodes });
+  const route = [episode.start, ...episode.stops].map(place => place.name);
+  assert.match(html, /assets\/episodes\/episode02\/asia%20map\.png/);
+  assert.doesNotMatch(html, /europe%20locations\.png|CHAPTER 02|mapped and ready/);
+  assert.match(html, /episode02-route-map/);
+  assert.equal((html.match(/class="episode02-stop-marker"/g) ?? []).length, 15);
+  assert.equal((html.match(/class="episode-preview-route"/g) ?? []).length, 14);
+  assert.deepEqual(route, [
+    'Istanbul, Turkey', 'Damascus, Syria', 'Baghdad, Iraq', 'Tehran, Iran',
+    'Kabul, Afghanistan', 'Islamabad, Pakistan', 'New Delhi, India',
+    'Kathmandu, Nepal', 'Dhaka, Bangladesh', 'Bangkok, Thailand', 'Hanoi, Vietnam',
+    'Hong Kong', 'Taipei', 'Shanghai, China', 'Beijing, China'
+  ]);
+  assert.match(html, /01[\s\S]*Istanbul, Turkey[\s\S]*15[\s\S]*Beijing, China/);
+  await fs.access('assets/episodes/episode02/asia map.png');
+});
 
 test('the completion screen follows both finishers and shows historic Istanbul video and places', async () => {
   const game = {
@@ -11,7 +36,8 @@ test('the completion screen follows both finishers and shows historic Istanbul v
       guide: { name: 'Player 2', avatar: '/assets/avatar new/wonder woman.jpg', position: 15 }
     },
     scores: { student: 55, guide: 49 },
-    winner: 'student'
+    winner: 'student',
+    completedPlayers: { student: true, guide: true }
   };
   const html = Finish(game);
   assert.match(html, /QUEST COMPLETE/);
@@ -48,6 +74,8 @@ test('timer expiry shows QUEST FAILED, ranks by score, and disables the next epi
   const html = Finish(game);
   assert.match(html, /TIME UP/);
   assert.match(html, /QUEST FAILED/);
+  assert.match(html, /The timer expired before both players got to the final stop\./);
+  assert.doesNotMatch(html, /completed the final question in Istanbul/);
   assert.match(html, /Player 2[\s\S]*30[\s\S]*Player 1[\s\S]*25/);
   assert.doesNotMatch(html, /AHEAD|TRAILING|TIED/);
   assert.match(html, /PLAY AGAIN/);
@@ -68,6 +96,20 @@ test('App.js exposes the application outlet and opening/episode flows', async ()
   assert.match(app, /Splash/);
   assert.match(app, /Episode01/);
   assert.match(app, /render/);
+});
+
+test('briefing and location handoffs preserve the outgoing view for a soft crossfade', async () => {
+  const app = await fs.readFile('src/App.js', 'utf8');
+  const styles = await fs.readFile('src/styles.css', 'utf8');
+  assert.match(app, /preserveViewForFade/);
+  assert.match(app, /fadeLocationPreview/);
+  assert.match(styles, /\.screen-transition-snapshot/);
+  assert.match(styles, /\.location-preview-crossfade/);
+  assert.match(styles, /player-preview-arrive/);
+  assert.match(styles, /\.screen-transition-snapshot\{[^}]*transition:opacity \.42s ease-out/);
+  assert.match(styles, /\.location-preview-crossfade\.is-fading\{opacity:0;transform:translateY\(16px\)/);
+  assert.match(styles, /@keyframes player-preview-arrive\{from\{opacity:0;transform:translateY\(20px\)/);
+  assert.match(app, /locationTransition/);
 });
 
 test('core responsibilities have dedicated modules', async () => {
@@ -114,11 +156,11 @@ test('episode data has one authoritative Episode 01 source', async () => {
 test('canonical episode journey records all five episode titles and route arcs', async () => {
   const { episodeJourney } = await import('../src/data/episodes/index.js');
   assert.deepEqual(episodeJourney, [
-    { id: 1, title: 'The West: Europe', route: ['London', 'Istanbul'] },
-    { id: 2, title: 'The East: Asia', route: ['Istanbul', 'Central Asia', 'China'] },
-    { id: 3, title: 'The Pacific: Islands', route: ['China', 'Japan', 'Philippines', 'California'] },
-    { id: 4, title: 'The New World: America', route: ['California', 'Texas', 'Mexico', 'Central America', 'Brazil'] },
-    { id: 5, title: 'The Old World: Africa', route: ['Brazil', 'West Africa', 'Morocco', 'Spain', 'Portugal', 'England'] }
+    { id: 1, title: 'THE WEST: EUROPE', route: ['London', 'Istanbul'] },
+    { id: 2, title: 'THE ROAD TO THE EAST', route: ['Istanbul', 'Central Asia', 'China'] },
+    { id: 3, title: 'ACROSS THE PACIFIC', route: ['China', 'Japan', 'Philippines', 'California'] },
+    { id: 4, title: 'THE AMERICAN CROSSING', route: ['California', 'Texas', 'Mexico', 'Central America', 'Brazil'] },
+    { id: 5, title: 'THE SANDS OF AFRICA', route: ['Brazil', 'West Africa', 'Morocco', 'Spain', 'Portugal', 'England'] }
   ]);
 });
 
@@ -226,7 +268,7 @@ test('Challenge cards cover Quiz, Reading, Speaking and Writing with in-card fee
   assert.match(challenge, /speaking-scores/);
   assert.doesNotMatch(challenge, /TURN ·|stop\.title/);
   assert.match(styles, /\.journey-route\.student\{stroke:#e65100/);
-  assert.match(styles, /\.journey-route\.guide\{stroke:#123b78/);
+  assert.match(styles, /\.journey-route\.guide\{stroke:#8000ff/);
   const mapMarkup = await fs.readFile('src/components/GameMap.js', 'utf8');
   assert.match(mapMarkup, /betweenStops \? 'EN ROUTE TO' : `STOP/);
   assert.doesNotMatch(mapMarkup, /Route revealed from London/);
@@ -254,6 +296,30 @@ test('player preview card shows the active avatar and name before its question',
   assert.match(preview, /ADA/);
   assert.doesNotMatch(preview, /previous player|player-preview-notice/i);
   assert.doesNotMatch(preview, /What does IMF stand for/);
+});
+
+test('Location 01 introduction appears before the first player preview', async () => {
+  const { Episode01 } = await import('../src/screens/episodes/Episode01/index.js');
+  const { createInitialGame, reduceAction } = await import('../src/core/gameState.js');
+  const game = reduceAction(createInitialGame(), 'start-challenge');
+  const video = await fs.readFile('assets/locations/episode01/london-tower-bridge.mp4');
+
+  assert.equal(game.locationPreview, true);
+  assert.equal(video.toString('ascii', 4, 8), 'ftyp');
+  const markup = Episode01({ game, episodes: [] });
+  assert.match(markup, /location-preview/);
+  assert.match(markup, /STOP 01/);
+  assert.match(markup, /London, England/);
+  assert.match(markup, /Tower Bridge opened on 30 June 1894/);
+  assert.match(markup, /london-tower-bridge\.mp4/);
+  assert.match(markup, /london-tower-bridge\.jpg/);
+  assert.doesNotMatch(markup, /Video by George Morina|Pexels/);
+  assert.doesNotMatch(markup, /player-preview-identity/);
+
+  const betweenCards = Episode01({ game: {
+    ...game, locationPreview: false, locationTransition: true, playerPreview: false
+  }, episodes: [] });
+  assert.doesNotMatch(betweenCards, /location-preview|player-preview-identity|quiz-photo-content|writing-question|listening-question/);
 });
 
 test('turn feedback slip replaces the Quiz card during movement, then scores and preview update', async () => {
@@ -336,7 +402,7 @@ test('a successful challenge advances its question index and caps score at city 
   const state = await fs.readFile('src/core/gameState.js', 'utf8');
   assert.match(state, /const scoreAfterTurnAward = scoreAfterAward\(scoreBeforeTurn, points\)/);
   assert.match(state, /const appliedPoints = scoreAfterTurnAward - scoreBeforeTurn/);
-  assert.match(state, /challengeIndex: fromIndex \+ \(advanced \? 1 : 0\)/);
+  assert.match(state, /challengeIndex: fromIndex \+ \(succeeded \? 1 : 0\)/);
   assert.match(state, /position: routeProgress\(scores\[currentPlayer\]\)/);
   assert.match(state, /scores\[currentPlayer\] = scoreAfterTurnAward/);
   assert.match(state, /activePlayer: nextPlayer/);

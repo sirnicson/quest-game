@@ -14,11 +14,12 @@ Make each player's route position a direct visual representation of score, with 
 - The avatar is interpolated along that player's route. Progress and score therefore cannot disagree about which player is ahead.
 - Challenge selection advances by a per-player question index, not by fractional route progress. Each player's 15-question initial deck has exactly 3 Quiz items, with the other 12 drawn from Reading, Speaking, Writing, and Listening. The deck then offers unused non-Quiz questions from that episode's banks before deterministic non-Quiz recycling; each player still receives exactly 3 Quiz challenges.
 - Challenge scores, including retries, remain 5, 2, or 0 points. A score cannot move a player beyond the next city checkpoint. Quiz Go Back moves to the previous city checkpoint and updates the score to match; Quiz Boost moves to the checkpoint one city beyond the leading player's current leg; Freeze remains a turn skip with no movement.
-- Episode completion remains at Istanbul after 14 route legs / 70 movement points, before any existing first-finisher bonus; first/second finish sequencing remains intact.
+- Reaching Istanbul after 14 route legs / 70 movement points opens the final question. A successful final answer awards 5 completion points without moving beyond Istanbul; the first finisher receives an additional 5-point bonus. Failing twice on the final question sends the player back one city and removes the points that carried them to Istanbul. The first finisher receives the winner celebration only while the timer is running; the second finisher receives the quieter runner-up celebration, then both see QUEST COMPLETE. If time expires before both finish, show TIME UP and QUEST FAILED with scores ordered high to low (Player 1 first on a tie).
 
 ## Deferred work
 
-- Authoring and organizing central Reading, Speaking, Writing, and Listening banks by Levels 1–5 is not part of this route change. Existing episode question data remains in use; no new level labels or questions are inferred here.
+- Authoring and organizing central Reading, Speaking, Writing, and Listening banks by Levels 1–5 is not part of this route change. When the bank refactor happens, keep skill/level tags internal, randomize each player's schedule independently with seeded selection, and balance both players to equivalent skill and difficulty distributions so neither receives a systematically easier mix. Do not reveal upcoming question types or levels in the UI. See the question-bank architecture decision in `QUEST-STATE.md`.
+- The existing three-Quiz-per-player rule remains in effect unless the owner changes it.
 
 ## Scope
 

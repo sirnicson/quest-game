@@ -78,6 +78,25 @@ export function playGameMove(kind='move'){
   osc.stop(now+0.25);
 }
 
+export function playFinishCelebration(){
+  if(!soundEnabled) return;
+  const ctx=ensureContext();
+  const now=ctx.currentTime;
+  [523.25,659.25,783.99,1046.5].forEach((frequency,index)=>{
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    const start=now+index*0.11;
+    osc.type='sine';
+    osc.frequency.setValueAtTime(frequency,start);
+    gain.gain.setValueAtTime(0.0001,start);
+    gain.gain.exponentialRampToValueAtTime(0.055,start+0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001,start+0.42);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start+0.45);
+  });
+}
+
 export function preloadSoundtracks(){
   return Promise.all(Object.keys(TRACKS).map(loadTrack));
 }

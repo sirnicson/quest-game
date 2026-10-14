@@ -1,7 +1,7 @@
 import { avatarHtml } from '../../../data/avatars.js';
 import { button, escapeHtml, laneClass } from '../../../components/view.js';
 import { currentChallenge } from '../../../core/challengeSelect.js';
-import { punishOptions, rewardsUsed } from '../../../core/gameState.js';
+import { punishOptions, rewardsUsed, scoreAfterAward } from '../../../core/gameState.js';
 import { checkWritingLength, writingVerdicts, POINTS } from '../../../core/challengeBank.js';
 
 const OTHER = { student: 'guide', guide: 'student' };
@@ -41,7 +41,9 @@ const judgeButtons = (game, disabled = false, allowed = ['GOOD', 'FAIR', 'RETRY'
 const verdictLine = (game, who = null) => {
   const verdict = game.verdict;
   if (!verdict) return '';
-  const pts = POINTS[verdict];
+  const playerId = game.activePlayer || 'student';
+  const scoreBefore = game.scores?.[playerId] ?? 0;
+  const pts = scoreAfterAward(scoreBefore, POINTS[verdict]) - scoreBefore;
   const reason = verdict === 'RETRY' && REASON_LABELS[game.verdictReason] ? ` · ${REASON_LABELS[game.verdictReason]}` : '';
   return `<p class="verdict-line ${verdict.toLowerCase()}" role="status">${who ? `${escapeHtml(who)} scored you ${verdict}` : verdict}${reason} · +${pts} PTS</p>`;
 };

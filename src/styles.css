@@ -29,6 +29,25 @@
 .map-heading p b{color:#e9b93e;padding:0 6px}
 .map{height:100%;min-height:400px;border:1px solid #f7f0dc35;border-radius:16px;overflow:hidden;box-shadow:0 22px 55px #06120d75;background:#294750}
 .map svg{width:100%;height:100%;display:block}
+.episode02-map{position:relative;isolation:isolate;background:#10241f}
+.episode-preview-screen .hud-center,.episode-preview-hud .hud-center{display:none}
+.episode02-map img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+.episode02-route-map{position:absolute;inset:0;z-index:1;width:100%;height:100%;display:block;pointer-events:none}
+.episode-preview-route{fill:none;stroke:#f1c84e;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2 9;filter:drop-shadow(0 1px 2px #07140fbf)}
+.episode-preview-stop-ring{fill:#ffd263;stroke:#f8d874;stroke-width:2}
+.episode-preview-stop-core{fill:#18291e}
+.episode-preview-stop-number{fill:#fff7df;font:900 11px Arial,sans-serif;text-anchor:middle}
+.episode-map-pending{display:grid;place-items:center;background:radial-gradient(ellipse at center,#29473b,#10221b 75%);text-align:center}
+.episode-map-pending>div{display:grid;gap:12px;padding:28px;color:#f7f0dc}
+.episode-map-pending span{color:#e9b93e;font-size:9px;font-weight:900;letter-spacing:.22em}
+.episode-map-pending strong{font:clamp(22px,3vw,38px) Georgia,serif}
+.episode-map-pending strong i{color:#e9b93e;font-style:normal;padding:0 8px}
+.episode-map-pending small{color:#c4cdbf;font-size:12px}
+.episode02-stop-marker{filter:drop-shadow(0 2px 3px #07140f99)}
+.episode02-marker-ring{fill:#ffd263;stroke:#f8d874;stroke-width:2}
+.episode02-marker-core{fill:#18291e}
+.episode02-marker-number{fill:#fff7df;font:900 11px Arial,sans-serif;text-anchor:middle}
+.episode02-city-label{fill:#fff7df;font:900 15px Arial,sans-serif;paint-order:stroke;stroke:#17241d;stroke-width:5px;stroke-linejoin:round}
 .map-graticule path{fill:none;stroke:#e5eee91a;stroke-width:1;stroke-dasharray:3 8}
 .continent path{fill:#d9d6be;stroke:#f0ead4;stroke-width:2;stroke-linejoin:round}
 .route-line{fill:none;stroke:#f1bf3c;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 2px 4px #08161499)}
@@ -145,6 +164,7 @@
 /* QUESTv2 corrections: preserve the living expedition atmosphere and keep the map visible. */
 .episode-briefing .episode-map-art{background:#10231f;z-index:0}
 .episode-briefing .episode-map-art img{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;opacity:1;filter:none}
+.episode-briefing .episode-map-art .europe-preview-map{position:absolute;inset:0;width:100%;height:100%;min-height:0;border:0;border-radius:0;box-shadow:none}
 .episode-briefing .episode-map-vignette{background:linear-gradient(90deg,#07100ceF 0%,#07100cc9 28%,#07100c24 59%,#07100c38 100%),linear-gradient(0deg,#07100c72,transparent 45%)}
 .episode-briefing .episode-briefing-top{z-index:5}
 
@@ -239,15 +259,35 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .start-callout{position:absolute;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);margin-top:92px;width:min(280px,34vw);padding:13px 16px;border:1px solid #e7bd4e66;border-radius:14px;background:#08130ef0;box-shadow:0 18px 45px #0008;backdrop-filter:blur(10px);text-align:center;color:#f8f0df;pointer-events:none}
 .start-callout span{display:block;font-size:8px;letter-spacing:.2em;color:#e9bb42;font-weight:900}.start-callout strong{display:block;font:25px Georgia,serif;margin:4px 0}.start-callout small{font-size:9px;color:#b9c1b5}
 .challenge-overlay{position:absolute;z-index:10;left:9%;top:29%;width:min(360px,31vw);max-height:62%;display:flex;pointer-events:auto}
+.location-preview-overlay{position:absolute;z-index:9;left:clamp(14px,2vw,30px);bottom:clamp(14px,2vw,28px);width:min(420px,38vw);pointer-events:none;animation:location-preview-in .45s ease-out both}
+.location-preview{overflow:hidden;border:1px solid #f4e6c477;border-radius:15px;background:#0b1913ed;box-shadow:0 18px 46px #0009;color:#f7f0dc;backdrop-filter:blur(8px)}
+.location-preview-video-wrap{position:relative;aspect-ratio:16/9;background:#17281f}
+.location-preview-video{display:block;width:100%;height:100%;object-fit:cover}
+.location-preview-kicker{position:absolute;left:11px;top:10px;padding:6px 8px;border-radius:999px;background:#0b1913c9;color:#f3c64b;font-size:8px;font-weight:900;letter-spacing:.16em}
+.location-preview-info{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:11px 14px 12px}
+.location-preview-info small{color:#e9bb42;font-size:8px;font-weight:900;letter-spacing:.2em}
+.location-preview-info h2{margin:3px 0 4px;font:20px Georgia,serif}
+.location-preview-info p{margin:0;color:#d3d7ca;font-size:11px;line-height:1.35}
+@keyframes location-preview-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.screen-transition-snapshot{position:fixed;inset:0;z-index:10000;width:100vw;height:100vh;overflow:hidden;pointer-events:none;will-change:opacity;transition:opacity .42s ease-out}
+.screen-transition-snapshot.is-fading{opacity:0}
+.location-preview-crossfade{position:fixed!important;z-index:10001!important;bottom:auto!important;pointer-events:none!important;animation:none!important;will-change:opacity,transform;transition:opacity .48s ease,transform .48s ease}
+.location-preview-crossfade.is-fading{opacity:0;transform:translateY(16px) scale(.985)}
+.gameplay-map .challenge-overlay .challenge-card.player-preview{animation:player-preview-arrive .58s cubic-bezier(.2,.75,.2,1) both}
+@keyframes player-preview-arrive{from{opacity:0;transform:translateY(20px) scale(.985);filter:blur(3px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+.gameplay-map .challenge-overlay.challenge-card-exiting .challenge-card:not(.player-preview){animation:challenge-card-push-down .42s cubic-bezier(.4,0,.8,.35) both}
+@keyframes challenge-card-push-down{to{opacity:0;transform:translateY(30px)}}
+@media(prefers-reduced-motion:reduce){.screen-transition-snapshot,.location-preview-crossfade,.movement-feedback-slip{transition:none!important}.screen-transition-snapshot.is-fading,.location-preview-crossfade.is-fading{opacity:0;filter:none;transform:none}.gameplay-map .challenge-overlay .challenge-card.player-preview,.gameplay-map .challenge-overlay.challenge-card-exiting .challenge-card:not(.player-preview){animation:none}}
 .movement-feedback-overlay{position:absolute;z-index:10;left:50%;top:auto;bottom:50px;transform:translateX(-50%);width:min(460px,82vw);display:flex;justify-content:center;pointer-events:none}
-.movement-feedback-slip{height:50px;box-sizing:border-box;display:grid;place-items:center;padding:0 20px;border:1px solid #f2d9ce77;border-radius:12px;background:#101a15ad;backdrop-filter:blur(4px);box-shadow:0 8px 28px #0005;color:#fff4df;text-align:center;font-size:clamp(13px,1.5vw,18px);font-weight:800;line-height:1.2;white-space:pre-line}
+.movement-feedback-slip{height:50px;box-sizing:border-box;display:grid;place-items:center;padding:0 20px;border:1px solid #f2d9ce77;border-radius:12px;background:#101a15ad;backdrop-filter:blur(4px);box-shadow:0 8px 28px #0005;color:#fff4df;text-align:center;font-size:clamp(13px,1.5vw,18px);font-weight:800;line-height:1.2;white-space:pre-line;transition:opacity .26s ease,transform .26s ease;will-change:opacity,transform}
+.movement-feedback-slip.is-exiting{opacity:0;transform:translateY(12px)}
 .challenge-overlay .challenge-card,.challenge-overlay .result-card{width:100%;min-height:0;max-height:100%;overflow:auto;padding:22px 24px;border-radius:18px;background:#dcb09fef;box-shadow:0 25px 70px #0009;border:1px solid #241b16aa;backdrop-filter:blur(7px);color:#1d211d}
 .challenge-overlay .challenge-card h2,.challenge-overlay .result-card h2{font-size:30px;margin:13px 0 9px}.challenge-overlay .challenge-card p{font-size:13px;line-height:1.45;color:#29302a}.challenge-overlay .option{background:#f2d9ceaa;padding:9px}.challenge-overlay .teacher-tools{margin-top:8px}.challenge-overlay .teacher-tools span{color:#536056}.challenge-overlay .btn{padding:11px 16px;font-size:10px}.result-overlay{top:31%}.result-overlay .result-card{text-align:center;align-items:center}.result-overlay .result-burst{font-size:38px}.result-overlay .movement{font-size:48px;margin:7px}.result-overlay .result-card p{font-size:13px;line-height:1.45}
 .gameplay-map .stop-node{transition:opacity .2s}.gameplay-map .stop-node:not(.active){opacity:.7}.gameplay-map .stop-node.active circle:first-child{filter:drop-shadow(0 0 16px #f5c84f);stroke-width:5}
 .gameplay-map .player-pin{z-index:4}.gameplay-map .player-pin circle{fill:#08150fdd;stroke:#f1c64c;stroke-width:2}.gameplay-map .player-pin .player-label{fill:#fff7df;font-size:11px;text-shadow:0 1px 4px #000}
 .gameplay-map .route-line{stroke:#c69528}.gameplay-map .route-dash{stroke:#f1c84e}
 @media(max-width:900px){.gameplay-map .map-stage{min-height:500px;height:calc(100vh - 64px)}.gameplay-map .camera-london .map svg{transform:translate(-1%,-24%) scale(2)}.challenge-overlay{left:5%;top:auto;bottom:5%;width:min(390px,90vw);max-height:48%}.start-callout{margin-top:75px;width:min(290px,70vw)}}
-@media(max-width:600px){.gameplay-map{min-height:calc(100vh - 64px)}.gameplay-map .map-stage{height:calc(100vh - 64px);min-height:430px}.gameplay-map .camera-london .map svg{transform:translate(-3%,-20%) scale(1.85)}.gameplay-title{left:16px;top:15px}.gameplay-title b{font-size:16px}.challenge-overlay{left:4%;bottom:4%;width:92%;max-height:54%}.challenge-overlay .challenge-card,.challenge-overlay .result-card{padding:18px}.start-callout{top:49%;margin-top:55px;width:76vw;padding:11px}.start-callout strong{font-size:21px}}
+@media(max-width:600px){.gameplay-map{min-height:calc(100vh - 64px)}.gameplay-map .map-stage{height:calc(100vh - 64px);min-height:430px}.gameplay-map .camera-london .map svg{transform:translate(-3%,-20%) scale(1.85)}.gameplay-title{left:16px;top:15px}.gameplay-title b{font-size:16px}.challenge-overlay{left:4%;bottom:4%;width:92%;max-height:54%}.challenge-overlay .challenge-card,.challenge-overlay .result-card{padding:18px}.location-preview-overlay{left:3%;bottom:3%;width:94%}.location-preview-info{padding:9px 11px}.location-preview-info h2{font-size:18px}.location-preview-info p{font-size:10px}.location-preview-info a{max-width:108px;text-align:right;line-height:1.3}.start-callout{top:49%;margin-top:55px;width:76vw;padding:11px}.start-callout strong{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.gameplay-map .map svg{transition:none!important}}
 
 /* Episode 01 map camera and the London-to-Manchester gameplay overlay */
@@ -261,7 +301,7 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .journey-route{fill:none;stroke:#e65100;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.6 2.8;filter:drop-shadow(0 1px 1px #1c030899)}
 .journey-route.student{stroke:#e65100}
 .journey-route.guide{stroke:#8000ff}
-.route-reveal-mask{fill:none;stroke:#fff;stroke-width:8;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;animation:reveal-journey-dots 4.2s ease-in-out forwards}
+.route-reveal-mask{fill:none;stroke:#fff;stroke-width:8;stroke-linecap:butt;stroke-dasharray:100;stroke-dashoffset:100;animation:reveal-journey-dots 4.2s ease-in-out forwards}
 @keyframes reveal-journey-dots{to{stroke-dashoffset:0}}
 .city-focus{fill:#51a0ff20;stroke:#b8d3ff;stroke-width:4;stroke-dasharray:7 5;pointer-events:none;animation:focus-pulse 2.2s ease-in-out infinite}
 .city-focus.complete{fill:#51a0ff20;stroke:#b8d3ff}
@@ -416,6 +456,9 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .gameplay-map .player-pin.ring-red circle:first-of-type{stroke:#e0313f}
 .gameplay-map .player-pin circle:first-of-type{stroke-width:1.2}
 .gameplay-map .player-pin.ring-green circle.avatar-ring,.gameplay-map .player-pin.ring-red circle.avatar-ring{stroke:none}
+.gameplay-map .player-pin .pin-effect-label{font:900 8px Arial,sans-serif;fill:#fff4dc;paint-order:stroke;stroke:#101810;stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.gameplay-map .player-pin .pin-effect-label.back,.gameplay-map .player-pin .pin-effect-label.freeze{fill:#f0444f}
+.gameplay-map .player-pin .pin-effect-label.boost{fill:#2fbf6a}
 
 /* LOBBY (first page: HOST / SOLO / invite link) */
 .lobby{display:flex;flex-direction:column;align-items:center}.lobby>.btn{position:static;min-width:256px;margin:35px 0 0;transform:none}.lobby>.btn:hover:not(:disabled){transform:translateY(-3px)}
@@ -485,6 +528,9 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .report-card{grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:12px;background:transparent;margin:28px auto}
 .report-rank{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;align-items:center;column-gap:12px;row-gap:5px;padding:18px 20px;background:#07150fcc;border:1px solid #ffffff26;border-radius:16px;text-align:left}
 .report-rank>small{grid-column:1/-1;color:#eac34f;font-size:10px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}
+.report-rank-place{grid-column:1/-1;display:grid;gap:3px}
+.report-rank-place small{color:#eac34f;font-size:10px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}
+.report-rank-place span{color:#f1c64a;font-size:8px;font-weight:800;letter-spacing:.16em}
 .report-avatar,.report-avatar img{grid-row:2;width:52px;height:52px;border-radius:50%;object-fit:cover}
 .report-rank>strong{grid-row:2;color:#fff7e7;font-size:clamp(16px,2vw,22px)}
 .report-rank>b{grid-row:2;color:#f1c64a;font:700 26px Georgia,serif;white-space:nowrap}
@@ -504,3 +550,13 @@ animation:forest-light 11s ease-in-out infinite alternate}
 .reward-tile small{font-size:8px;letter-spacing:.16em;color:#8a8f86}
 .reward-tile:hover:not(:disabled){transform:translateY(-2px);background:#fff;box-shadow:0 6px 14px #0002;border-color:#c79a2e}
 .reward-tile:disabled{cursor:default;opacity:.4;filter:grayscale(1)}
+.finish-celebration-winner:before{content:none}
+.finish-celebration>*:not(.finish-confetti-burst){position:relative;z-index:2}
+.finish-confetti-burst{position:absolute;z-index:1;top:50%;width:1px;height:1px;pointer-events:none}
+.finish-confetti-burst.left{left:5%}.finish-confetti-burst.right{right:5%}
+.finish-confetti-burst i{position:absolute;left:0;top:0;width:7px;height:11px;border-radius:2px;background:#f4cf5b;opacity:0;animation:confetti-splash 1.8s cubic-bezier(.14,.72,.32,1) var(--delay) both}
+.finish-confetti-burst i:nth-child(4n+1){background:#ef4d45}.finish-confetti-burst i:nth-child(4n+2){background:#42a979}.finish-confetti-burst i:nth-child(4n+3){background:#467ec4}
+@keyframes confetti-splash{0%{opacity:0;transform:translate(0,0) rotate(0) scale(.4)}12%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rotation)) scale(1)}}
+.report-content{width:min(820px,calc(100vw - 40px));max-height:calc(100svh - 40px);overflow-y:auto;padding:clamp(20px,3vw,36px);background:#0e1d16a8;backdrop-filter:blur(5px)}
+.report-art{background:linear-gradient(90deg,#07130e66,#0b1c1560 48%,#07130e70),linear-gradient(0deg,#08130f80,transparent 60%)}
+.timeout-report .report-card{grid-template-columns:1fr;margin:20px auto}

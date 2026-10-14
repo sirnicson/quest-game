@@ -22,6 +22,7 @@ const CITY_PIN_OFFSET = CITY_LOCATOR_RADIUS + AVATAR_RADIUS + CITY_PIN_GAP;
 // Player roads are independently shaped, but share city endpoints and stay side by side.
 const SEA_LEGS = { 2: 0.1, 10: -0.07, 12: -0.15 };
 const ROUTE_SAMPLES = 36;
+const routeArcCache = new Map();
 
 const cubic = (p0, p1, p2, p3, t) => {
   const u = 1 - t;
@@ -98,12 +99,30 @@ export function routePosition(progress, player = 'student') {
   if (position >= LAST) return points[LAST];
   const index = Math.floor(position);
   const fraction = position - index;
-  const samples = routeLegPoints(index, player);
-  const sample = fraction * (samples.length - 1);
-  const lo = Math.floor(sample);
-  const t = sample - lo;
-  const a = samples[lo];
-  const b = samples[Math.min(samples.length - 1, lo + 1)];
+  const key = `${player}:${index}`;
+  let arc = routeArcCache.get(key);
+  if (!arc) {
+    const samples = routeLegPoints(index, player, ROUTE_SAMPLES * 8);
+    const distances = [0];
+    for (let i = 1; i < samples.length; i++) {
+      distances.push(distances[i - 1] + Math.hypot(samples[i].x - samples[i - 1].x, samples[i].y - samples[i - 1].y));
+    }
+    arc = { samples, distances, length: distances.at(-1) || 1 };
+    routeArcCache.set(key, arc);
+  }
+  const target = fraction * arc.length;
+  let low = 0;
+  let high = arc.distances.length - 1;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (arc.distances[mid] < target) low = mid + 1;
+    else high = mid;
+  }
+  const lo = Math.max(0, low - 1);
+  const span = arc.distances[low] - arc.distances[lo];
+  const t = span ? (target - arc.distances[lo]) / span : 0;
+  const a = arc.samples[lo];
+  const b = arc.samples[low];
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
@@ -172,12 +191,20 @@ export function mapSvg(episode, game) {
     const moving = anim && anim.player === key;
     const falling = game.backAnim && game.backAnim.player === key;
     const at = avatarPosition(moving ? anim.from : falling ? game.backAnim.from : player.position, key);
-    const ring = game.retry?.[key] || game.backed?.[key] || game.backAnim?.player === key
-      ? 'ring-red'
-      : player.position > 0 ? 'ring-green' : 'ring-none';
+    const effect = game.rewardEffect?.playerId === key ? game.rewardEffect : null;
+    const ring = effect
+      ? effect.type === 'boost' ? 'ring-green' : 'ring-red'
+      : game.retry?.[key] || game.backed?.[key] || game.backAnim?.player === key
+        ? 'ring-red'
+        : player.position > 0 ? 'ring-green' : 'ring-none';
+    const effectLabel = effect?.type === 'back'
+      ? `${player.name} goes behind -${effect.pointsLost}pts`
+      : effect?.type === 'freeze' ? `${player.name} misses a turn 0pts`
+        : effect?.type === 'boost' ? `${player.name} goes ahead +5pts` : '';
     return `<g class="player-pin ${key} ${ring}" data-pin="${key}" transform="translate(${fmt(at.x)} ${fmt(at.y)})" aria-label="${escapeHtml(player.name)}">
       <circle r="12.6"></circle>
       ${avatarSvg(player.avatar, key)}
+      ${effectLabel ? `<text class="pin-effect-label ${effect.type}" y="28" text-anchor="middle">${escapeHtml(effectLabel)}</text>` : ''}
     </g>`;
   }).join('');
 
@@ -202,4 +229,18 @@ export function mapSvg(episode, game) {
     </div>
     ${routeVisible ? `<div class="map-arrival"><span>${betweenStops ? 'EN ROUTE TO' : `STOP ${String(arrivalIndex + 1).padStart(2, '0')}`}</span><strong>${escapeHtml(journey[arrivalIndex].name)}</strong></div>` : ''}
   </div>`;
+}
+
+export function episode01PreviewMapSvg() {
+  const routes = Array.from({ length: LAST }, (_, index) =>
+    `<path class="episode-preview-route" d="${legPath(index, 'student')}"/>`
+  ).join('');
+  const markers = points.map((point, index) => `<g class="episode-preview-stop" transform="translate(${fmt(point.x)} ${fmt(point.y)})" aria-label="Stop ${String(index + 1).padStart(2, '0')}: ${escapeHtml(journey[index].name)}">
+    <circle class="episode-preview-stop-ring" r="17"/><circle class="episode-preview-stop-core" r="12"/>
+    <text class="episode-preview-stop-number" y="4">${String(index + 1).padStart(2, '0')}</text>
+  </g>`).join('');
+  return `<div class="map europe-preview-map"><svg viewBox="0 0 1600 920" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Episode 01 route map with one dashed route through all 15 city stops">
+    <image class="map-base" href="/assets/episodes/episode01/europe%20locations.png" x="0" y="0" width="1600" height="920" preserveAspectRatio="none"/>
+    <g class="episode-preview-routes">${routes}</g><g class="episode-preview-markers">${markers}</g>
+  </svg></div>`;
 }

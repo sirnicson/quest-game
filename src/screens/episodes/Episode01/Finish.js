@@ -5,14 +5,14 @@ import { button } from '../../../components/view.js';
 const other = player => player === 'student' ? 'guide' : 'student';
 
 export function Finish(game) {
-  const bothFinished = game.players.student.position >= 15 && game.players.guide.position >= 15;
+  const bothFinished = Boolean(game.completedPlayers?.student && game.completedPlayers?.guide);
   if (!bothFinished) {
     const studentScore = game.scores?.student ?? 0;
     const guideScore = game.scores?.guide ?? 0;
     const timeoutPlayers = [
       { id: 'student', score: studentScore },
       { id: 'guide', score: guideScore }
-    ].sort((a, b) => b.score - a.score);
+    ].sort((a, b) => b.score - a.score || (a.id === 'student' ? -1 : 1));
     return `<section class="report screen timeout-report">
       <video class="report-video" autoplay muted loop playsinline aria-hidden="true">
         <source src="/assets/episodes/episode01/hagia-sophia-drone.mp4" type="video/mp4">
@@ -22,7 +22,7 @@ export function Finish(game) {
         <div class="timeout-clock">TIME UP</div>
         <div class="eyebrow">EPISODE 01 · JOURNEY REPORT</div>
         <h1>QUEST FAILED</h1>
-        <p>The 60-minute journey ended before both players reached Istanbul.</p>
+        <p>The timer expired before both players got to the final stop.</p>
         <div class="report-card">
           ${timeoutPlayers.map(({ id, score }) => `<article class="report-rank"><span class="report-avatar">${avatarHtml(game.players[id].avatar)}</span><strong>${escapeHtml(game.players[id].name)}</strong><b>${score}<small>pts</small></b></article>`).join('')}
         </div>
@@ -33,7 +33,7 @@ export function Finish(game) {
   const winner = game.winner || 'student';
   const runnerUp = other(winner);
   const rankCard = (place, player, modifier) => `<article class="report-rank ${modifier}">
-    <small>${place}</small>
+    <div class="report-rank-place"><small>${place}</small></div>
     <span class="report-avatar">${avatarHtml(game.players[player].avatar)}</span>
     <strong>${escapeHtml(game.players[player].name)}</strong>
     <b>${game.scores?.[player] ?? 0}<small>pts</small></b>

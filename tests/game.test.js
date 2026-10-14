@@ -5,7 +5,7 @@ import { createInitialGame, applyMovement, advanceScreen, completePlayerTurn, re
 test('starts on splash with two players at START', () => {
   const game = createInitialGame();
   assert.equal(game.screen, 'splash');
-  assert.equal(game.timerSeconds, 3600);
+  assert.equal(game.timerSeconds, 3000);
   assert.equal(game.players.student.position, 0);
   assert.equal(game.players.guide.position, 0);
 });
@@ -139,7 +139,7 @@ test('back returns to the previous screen and home reset clears the session', ()
   assert.equal(game.screen, 'splash');
   assert.equal(game.players.student.name, 'Player 1');
   assert.equal(game.players.student.position, 0);
-  assert.equal(game.timerSeconds, 3600);
+  assert.equal(game.timerSeconds, 3000);
   assert.deepEqual(game.history, []);
 });
 

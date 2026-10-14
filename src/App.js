@@ -12,13 +12,17 @@ import { Episode03 } from './screens/episodes/Episode03/index.js';
 import { Episode04 } from './screens/episodes/Episode04/index.js';
 import { Episode05 } from './screens/episodes/Episode05/index.js';
 import { challenges as episode01Challenges } from './data/episodes/episode01Challenges.js';
-import { startAmbient, stopAmbient, fadeAmbient, startGameplay, stopGameplay, toggleAmbient, pauseGameplay, resumeGameplay, isSoundEnabled, playGameMove } from './core/audio.js';
+import { startAmbient, stopAmbient, fadeAmbient, startGameplay, stopGameplay, toggleAmbient, pauseGameplay, resumeGameplay, isSoundEnabled, playGameMove, playFinishCelebration } from './core/audio.js';
 import { mapCameraPose, avatarPosition, routeDistance, ROUTE_LEGS } from './components/GameMap.js';
 import { currentChallenge } from './core/challengeSelect.js';
 import { checkListeningAnswer, LISTENING_POINTS } from './core/listeningEngine.js';
 import { checkQuizAnswer, checkReadingAnswer, checkWritingLength, writingVerdicts, POINTS } from './core/challengeBank.js';
 
 const TURN_FEEDBACK_MS = 1800;
+const CARD_EXIT_MS = 420;
+const CARD_FEEDBACK_GAP_MS = 120;
+const FEEDBACK_BEFORE_MOVE_MS = 360;
+const FEEDBACK_EXIT_MS = 260;
 const STILL_FEEDBACK_MS = 1000;
 const SCORE_UPDATE_MS = 450;
 const CAMERA_MS = 2400;
@@ -33,91 +37,243 @@ export function createApp(root) {
   let timer = null;
   let previewTimer = null;
   let previewKey = null;
+  let locationTimer = null;
+  let locationKey = null;
   let mapDrag = null;
   let turnTimer = null;
   let finishTimer = null;
   let finishKey = null;
   let writingSync = null;
   let cameraFrame = null;
+  let cameraResolve = null;
   let recognition = null;
   const gameEpisodes = episodes.map(item => item.id===1 ? {...item, challenges: episode01Challenges} : item);
+
+  function preserveViewForFade(){
+    const current=root.querySelector('.app');
+    if(!current) return;
+    const snapshot=current.cloneNode(true);
+    snapshot.classList.add('screen-transition-snapshot');
+    snapshot.setAttribute('aria-hidden','true');
+    document.body.append(snapshot);
+    requestAnimationFrame(()=>snapshot.classList.add('is-fading'));
+    setTimeout(()=>snapshot.remove(),760);
+  }
+
+  function fadeLocationPreview(){
+    const current=root.querySelector('.location-preview-overlay');
+    if(!current) return;
+    const rect=current.getBoundingClientRect();
+    const snapshot=current.cloneNode(true);
+    snapshot.classList.add('location-preview-crossfade');
+    snapshot.setAttribute('aria-hidden','true');
+    Object.assign(snapshot.style,{
+      left:`${rect.left}px`,top:`${rect.top}px`,bottom:'auto',width:`${rect.width}px`
+    });
+    const video=snapshot.querySelector('video');
+    if(video){
+      video.pause();
+      video.removeAttribute('autoplay');
+      video.querySelectorAll('source').forEach(source=>source.remove());
+      video.removeAttribute('src');
+    }
+    document.body.append(snapshot);
+    requestAnimationFrame(()=>snapshot.classList.add('is-fading'));
+    setTimeout(()=>snapshot.remove(),650);
+  }
 
   // Shows the card's green/red feedback, then hands the turn to the other player.
   function finishTurn(points){
     playGameMove(points > 0 ? 'correct' : 'incorrect');
     const owner=game.activePlayer;
+    const startingPosition=game.players[owner]?.position ?? 0;
     clearTimeout(turnTimer);
-    turnTimer=setTimeout(()=>{
+    const settle=()=>{
       if(game.screen!=='challenge' || game.activePlayer!==owner) return;
       const scoresBeforeTurn = { ...game.scores };
-      game={...completePlayerTurn(game,points),displayScores:scoresBeforeTurn};
+      const completedTurn=completePlayerTurn(game,points);
+      const destinationPosition=completedTurn.players[owner]?.position ?? startingPosition;
+      const firstManchesterArrival=startingPosition<1 && destinationPosition>=1 && !(completedTurn.locationStopsSeen ?? []).includes(1);
+      const locationStop=firstManchesterArrival ? 1 : null;
+      game={...completedTurn,cardExiting:false,displayScores:scoresBeforeTurn};
       render();
       const moving = Boolean(game.moveAnim || game.backAnim);
       const finishTransition = () => {
         previewTimer = null;
         if (game.screen !== 'challenge') return;
         if (game.finishCelebration) {
-          game = { ...game, moveAnim: null, backAnim: null, displayScores: null, movementFeedback: null, transitionPhase: null };
+          game = { ...game, moveAnim: null, backAnim: null, displayScores: null, movementFeedback: null, rewardEffect: null, scoreAfterBack: null, transitionPhase: null };
           render();
           return;
         }
         if (!game.playerPreview) return;
         const currentKey = `${game.activePlayer}:${game.players[game.activePlayer]?.position}`;
         if (currentKey !== previewKey) return;
-        game = { ...game, moveAnim: null, backAnim: null, displayScores: null, movementFeedback: null, transitionPhase: 'score' };
+        game = { ...game, moveAnim: null, backAnim: null, displayScores: null, rewardEffect: null, scoreAfterBack: null, transitionPhase: 'feedback-exit' };
         render();
         previewTimer = setTimeout(() => {
-          if (game.screen !== 'challenge' || game.transitionPhase !== 'score') return;
-          game = { ...game, transitionPhase: null };
-          previewKey = null;
+          if (game.screen !== 'challenge' || game.transitionPhase !== 'feedback-exit') return;
+          game = { ...game, movementFeedback: null, transitionPhase: 'score' };
           previewTimer = null;
           render();
-        }, SCORE_UPDATE_MS);
+          previewTimer = setTimeout(() => {
+            if (game.screen !== 'challenge' || game.transitionPhase !== 'score') return;
+            if (locationStop !== null && !(game.locationStopsSeen ?? []).includes(locationStop)) {
+              game = {
+                ...game,
+                locationPreview: true,
+                locationPreviewStop: locationStop,
+                locationStopsSeen: [...(game.locationStopsSeen ?? []), locationStop],
+                locationTransition: false,
+                playerPreview: false,
+                transitionPhase: null
+              };
+              previewKey = null;
+              previewTimer = null;
+              render();
+              return;
+            }
+            game = { ...game, transitionPhase: null };
+            previewKey = null;
+            previewTimer = null;
+            render();
+          }, SCORE_UPDATE_MS);
+        }, FEEDBACK_EXIT_MS);
       };
-      if (moving) runMoveAnimation().then(finishTransition);
+      if (moving) {
+        previewTimer = setTimeout(() => {
+          if (game.screen !== 'challenge' || !game.playerPreview) return;
+          previewTimer = null;
+          runMoveAnimation().then(finishTransition);
+        }, FEEDBACK_BEFORE_MOVE_MS);
+      }
       else previewTimer = setTimeout(finishTransition, STILL_FEEDBACK_MS);
+    };
+    turnTimer=setTimeout(()=>{
+      if(game.screen!=='challenge' || game.activePlayer!==owner) return;
+      game={...game,cardExiting:true};
+      render();
+      turnTimer=setTimeout(settle,CARD_EXIT_MS + CARD_FEEDBACK_GAP_MS);
     },TURN_FEEDBACK_MS);
   }
 
-  // Cinematic move: the camera follows the mover while the avatar travels the new leg of the route.
-  function runMoveAnimation(){
+  // Show the affected player and penalty first, then follow the active player's move.
+  async function runMoveAnimation(){
     const anim=game.moveAnim;
-    animateMapTo(game.camera);
-    const backMotion=runBackAnimation();
-    if(!anim) return backMotion;
-    const forwardMotion=animatePlayerRoute(anim, MOVE_MS * Math.max(1, Math.abs(anim.to - anim.from)));
-    return Promise.all([forwardMotion,backMotion]).then(()=>undefined);
+    const back=game.backAnim;
+    const effect=game.rewardEffect;
+    const finalCamera=game.camera;
+    if(back){
+      const setbackCamera=`stop:${Math.min(14,Math.floor(back.to))}`;
+      game={...game,camera:setbackCamera};
+      await runBackAnimation(setbackCamera);
+      game={...game,backAnim:null,displayScores:game.scoreAfterBack ?? game.scores,transitionPhase:'penalty',camera:finalCamera};
+      render();
+      if(effect?.type==='back') await new Promise(resolve=>setTimeout(resolve,SCORE_UPDATE_MS));
+    } else if(effect?.type==='freeze'){
+      const position=game.players[effect.playerId]?.position ?? 0;
+      const freezeCamera=`stop:${Math.min(14,Math.floor(position))}`;
+      game={...game,camera:freezeCamera};
+      await animateMapTo(freezeCamera);
+      await new Promise(resolve=>setTimeout(resolve,STILL_FEEDBACK_MS));
+    }
+    if(!anim) return;
+    game={...game,camera:finalCamera};
+    await animatePlayerRoute(anim,MOVE_MS * Math.max(1,Math.abs(anim.to-anim.from)),finalCamera);
   }
-  function animatePlayerRoute(movement, duration){
+  function animatePlayerRoute(movement, duration, followCamera = null){
     return new Promise(resolve=>{
-      const start=performance.now();
-      const step=now=>{
-        const pin=root.querySelector(`[data-pin="${movement.player}"]`);
-        if(!pin){resolve();return;}
-        const t=Math.min(1,Math.max(0,now-start)/duration);
-        const progress=Math.min(ROUTE_LEGS,movement.from+(movement.to-movement.from)*ease(t));
+      const cameraFrom=followCamera ? (game.mapView || mapCameraPose(game.camera)) : null;
+      const cameraTo=followCamera ? mapCameraPose(followCamera) : null;
+      const world=followCamera ? root.querySelector('.map-world') : null;
+      const oldWorldTransition=world?.style.transition ?? '';
+      const initialPin=root.querySelector(`[data-pin="${movement.player}"]`);
+      const oldPinTransition=initialPin?.style.transition ?? '';
+      const routeMasks=Array.from({length:ROUTE_LEGS},(_,i)=>root.querySelector(`#route-mask-${movement.player}-${i} path`));
+      const pin=initialPin;
+      if(!pin){resolve();return;}
+      const sampleCount=Math.max(48,Math.ceil(duration/1000*48));
+      const frames=[];
+      for(let i=0;i<=sampleCount;i++){
+        const t=i/sampleCount;
+        const eased=ease(t);
+        const progress=Math.min(ROUTE_LEGS,movement.from+(movement.to-movement.from)*eased);
         const point=avatarPosition(progress,movement.player);
-        pin.setAttribute('transform',`translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`);
-        const routeProgress=routeDistance(progress);
-        for(let i=0;i<ROUTE_LEGS;i++){
-          const maskPath=root.querySelector(`#route-mask-${movement.player}-${i} path`);
-          if(!maskPath) continue;
-          const fraction=Math.max(0,Math.min(1,routeProgress-i));
-          maskPath.classList.toggle('drawn',i+1<=routeProgress);
-          maskPath.classList.toggle('partial',i+1>routeProgress);
-          maskPath.style.strokeDashoffset=String(i+1<=routeProgress?0:i>=routeProgress?100:(1-fraction)*100);
+        let view=null;
+        if(cameraTo){
+          const scale=cameraFrom.scale+(cameraTo.scale-cameraFrom.scale)*eased;
+          const targetX=800-point.x*scale;
+          const targetY=460-point.y*scale;
+          const x=cameraFrom.x+(targetX-cameraFrom.x)*eased;
+          const y=cameraFrom.y+(targetY-cameraFrom.y)*eased;
+          view={scale,x,y};
         }
-        if(t<1) requestAnimationFrame(step);
-        else setTimeout(resolve,PIN_SETTLE_MS);
+        frames.push({progress:routeDistance(progress),point,view});
+      }
+      if(world) world.style.transition='none';
+      pin.style.transition='none';
+      let previousComplete=Math.floor(frames[0].progress);
+      const start=performance.now();
+      const updateRoute=now=>{
+        const t=Math.min(1,Math.max(0,(now-start)/duration));
+        const at=t*sampleCount;
+        const sample=Math.min(sampleCount-1,Math.floor(at));
+        const fraction=t>=1?1:at-sample;
+        const from=frames[sample];
+        const to=frames[Math.min(sampleCount,sample+1)];
+        const mix=(a,b)=>a+(b-a)*fraction;
+        const point={x:mix(from.point.x,to.point.x),y:mix(from.point.y,to.point.y)};
+        const routeProgress=mix(from.progress,to.progress);
+        pin.setAttribute('transform',`translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`);
+        if(world && from.view && to.view){
+          const view={scale:mix(from.view.scale,to.view.scale),x:mix(from.view.x,to.view.x),y:mix(from.view.y,to.view.y)};
+          world.setAttribute('transform',`translate(${view.x.toFixed(2)} ${view.y.toFixed(2)}) scale(${view.scale.toFixed(5)})`);
+          game.mapView=view;
+        }
+        const complete=Math.floor(routeProgress+1e-9);
+        if(complete!==previousComplete){
+          const first=Math.min(complete,previousComplete);
+          const last=Math.max(complete,previousComplete);
+          for(let i=first;i<last && i<ROUTE_LEGS;i++){
+            const path=routeMasks[i];
+            if(!path) continue;
+            const drawn=i<complete;
+            path.classList.toggle('drawn',drawn);
+            path.classList.toggle('partial',!drawn);
+            path.style.strokeDashoffset=drawn?'0':'100';
+          }
+          previousComplete=complete;
+        }
+        const activeLeg=Math.min(ROUTE_LEGS-1,complete);
+        const activePath=routeMasks[activeLeg];
+        if(activePath){
+          const fraction=Math.max(0,Math.min(1,routeProgress-activeLeg));
+          const completeLeg=fraction>=1-1e-9;
+          activePath.classList.toggle('drawn',completeLeg);
+          activePath.classList.toggle('partial',!completeLeg);
+          activePath.style.strokeDashoffset=String(completeLeg?0:(1-fraction)*100);
+        }
+        if(t<1) requestAnimationFrame(updateRoute);
+        else {
+          const final=frames.at(-1);
+          pin.setAttribute('transform',`translate(${final.point.x.toFixed(2)} ${final.point.y.toFixed(2)})`);
+          if(world && final.view){
+            world.setAttribute('transform',`translate(${final.view.x.toFixed(2)} ${final.view.y.toFixed(2)}) scale(${final.view.scale.toFixed(5)})`);
+            world.style.transition=oldWorldTransition;
+            game.mapView=final.view;
+          }
+          pin.style.transition=oldPinTransition;
+          setTimeout(resolve,PIN_SETTLE_MS);
+        }
       };
-      requestAnimationFrame(step);
+      requestAnimationFrame(updateRoute);
     });
   }
   // A setback: the affected avatar walks back along the leg it last travelled.
-  function runBackAnimation(){
+  function runBackAnimation(camera){
     const back=game.backAnim;
     if(!back) return Promise.resolve();
-    return animatePlayerRoute(back,BACK_MS);
+    return animatePlayerRoute(back,BACK_MS,camera);
   }
 
   // Audio that finishes (or cannot load) unlocks every gap, keeping text already entered.
@@ -153,19 +309,24 @@ export function createApp(root) {
     const target = mapCameraPose(camera);
     const from = game.mapView || mapCameraPose('overview');
     cancelAnimationFrame(cameraFrame);
-    const start = performance.now();
-    const step = now => {
-      if (!root.querySelector('.map-world')) return;
-      const e = ease(Math.min(1, (now - start) / CAMERA_MS));
-      game.mapView = {
-        scale: from.scale + (target.scale - from.scale) * e,
-        x: from.x + (target.x - from.x) * e,
-        y: from.y + (target.y - from.y) * e
+    cameraResolve?.();
+    return new Promise(resolve=>{
+      cameraResolve=resolve;
+      const start = performance.now();
+      const step = now => {
+        if (!root.querySelector('.map-world')) { cameraResolve=null; resolve(); return; }
+        const e = ease(Math.min(1, (now - start) / CAMERA_MS));
+        game.mapView = {
+          scale: from.scale + (target.scale - from.scale) * e,
+          x: from.x + (target.x - from.x) * e,
+          y: from.y + (target.y - from.y) * e
+        };
+        applyMapView(game.mapView);
+        if (e < 1) cameraFrame = requestAnimationFrame(step);
+        else { cameraResolve=null; resolve(); }
       };
-      applyMapView(game.mapView);
-      if (e < 1) cameraFrame = requestAnimationFrame(step);
-    };
-    cameraFrame = requestAnimationFrame(step);
+      cameraFrame = requestAnimationFrame(step);
+    });
   }
 
 
@@ -202,7 +363,29 @@ export function createApp(root) {
   }
 
   function render(){
-    const shouldPreview = game.screen === 'challenge' && game.playerPreview && !game.finishCelebration;
+    const nextLocationKey = game.screen === 'challenge' && game.locationPreview ? `location-${game.locationPreviewStop ?? 0}` : null;
+    if (nextLocationKey !== locationKey) {
+      clearTimeout(locationTimer);
+      locationTimer = null;
+      locationKey = nextLocationKey;
+      if (nextLocationKey) {
+        locationTimer = setTimeout(() => {
+          if (locationKey !== nextLocationKey || game.screen !== 'challenge' || !game.locationPreview) return;
+          fadeLocationPreview();
+          game = { ...game, locationPreview: false, locationTransition: true, playerPreview: false };
+          locationKey = null;
+          locationTimer = null;
+          render();
+          locationTimer = setTimeout(() => {
+            if (game.screen !== 'challenge' || !game.locationTransition) return;
+            game = { ...game, locationTransition: false, playerPreview: true };
+            locationTimer = null;
+            render();
+          }, 500);
+        }, 7000);
+      }
+    }
+    const shouldPreview = game.screen === 'challenge' && game.playerPreview && !game.finishCelebration && !game.locationPreview;
     const nextPreviewKey = shouldPreview
       ? `${game.activePlayer}:${game.players[game.activePlayer]?.position}`
       : null;
@@ -234,6 +417,7 @@ export function createApp(root) {
       finishKey = nextFinishKey;
     }
     if (nextFinishKey && !finishTimer && !game.moveAnim && !game.backAnim) {
+      if (game.finishCelebration.place === 'winner') playFinishCelebration();
       const duration = game.finishCelebration.place === 'winner' ? 5200 : 3600;
       finishTimer = setTimeout(() => {
         if (finishKey !== nextFinishKey || game.finishCelebration?.player !== nextFinishKey.split(':')[0]) return;
@@ -343,6 +527,7 @@ export function createApp(root) {
   }
 
   function startEpisode(seed){
+    preserveViewForFade();
     fadeAmbient(1200).then(()=>startGameplay());
     game=reduceAction(game,{type:'start-episode',episodeId:1,seed});
     startTimer(); render(); animateMapTo('london');
@@ -392,22 +577,25 @@ export function createApp(root) {
     if(actionName==='cancel-room'){ leaveRoom(); setLobby({mode:'choose',error:null}); return; }
     if(actionName==='copy-link'){ copyText(lobby.link).then(ok=>setLobby({copied:ok})); return; }
     if(actionName==='episode'){
-      game={...game,previewEpisode:Math.max(1,Math.min(5,Number(stopId)||1)),screen:'map'};
-      if(game.previewEpisode===1) startTimer(); else stopTimer();
+      game={...game,previewEpisode:Math.max(1,Math.min(5,Number(stopId)||1)),previewMode:true,screen:'map'};
+      stopTimer();
       render(); return;
     }
     if(actionName==='replay-episode'){
       clearTimeout(finishTimer); finishTimer=null; finishKey=null;
       clearTimeout(previewTimer); previewTimer=null; previewKey=null;
+      clearTimeout(locationTimer); locationTimer=null; locationKey=null;
       startEpisode(Date.now());
       return;
     }
     if(actionName==='home-reset'){
+      clearTimeout(locationTimer); locationTimer=null; locationKey=null;
       stopTimer(); stopGameplay(); stopAmbient(); leaveRoom(); lobby={mode:'choose'}; game=reduceAction(game,'home-reset'); render(); return;
     }
     if(actionName==='back'){
+      clearTimeout(locationTimer); locationTimer=null; locationKey=null;
       if(['map','challenge','result','report'].includes(game.screen)) { stopGameplay(); startAmbient(); }
-      game=reduceAction(game,'back');
+      game={...reduceAction(game,'back'),locationPreview:false,locationTransition:false};
       if(['map','challenge','result'].includes(game.screen)) startTimer(); else stopTimer();
       render(); return;
     }

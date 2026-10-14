@@ -1,120 +1,118 @@
-# QUEST — Source of Truth (state after the 4.0 freeze)
+# QUEST - current project state
 
-Last updated: 2026-10-08. Read this first. It supersedes `QUEST-4.0-NOTES.md` for "what exists now"; the 4.0 notes remain the rollback reference.
+Updated: 2026-10-14. This document is the source of truth for current rules, implementation and outstanding work. Earlier state notes are preserved in docs/legacy/QUEST-STATE-before-integration-2026-10-14.md. Rollback copies remain at .rollback-QUEST3.3, .rollback-QUEST4.0, .rollback-QUEST5.0 and .rollback-QUEST6.0.
 
-## 1. What QUEST is
-Browser "English Test Adventure" for two players. Episode 01: London → Istanbul, 15 stops, 50:00 session timer. No dependencies; plain ES modules + a small Node server.
+## Project and development
 
-Run: `node scripts/dev.mjs` → http://127.0.0.1:5173/ (env `PORT`, `HOST`). Tests: `node --test tests/*.test.js` (currently **60 passing**; do not use `npm test`).
+QUEST is a browser English learning adventure for two players. Episode 01 follows 15 locations from London to Istanbul. The project uses plain JavaScript ES modules and a Node server, with no runtime package dependencies.
 
-Standing rules from the owner:
-- Never permanently delete assets; archive to a legacy folder.
-- All images are publicly sourced / open for public use; copyright concerns are overridden.
-- The user iterates one request at a time; verify in the browser and with tests, report concisely.
+- Main branch is named master. The development worktree is QUEST/listening-multi-gap, branch codex/listening-multi-gap.
+- Start the server with npm run dev (on Windows, npm.cmd run dev), then open http://127.0.0.1:5173. Start it from the checkout whose code you intend to preview. PORT and HOST can override the defaults. A port-in-use error means another server already occupies that port.
+- Verify with node --test tests/*.test.js and npm run build. Current integration checks: 99 tests pass. The build script checks required source files; it does not bundle the app or prove visual animation quality.
+- Archive replaced assets and question files under legacy rather than deleting them.
+- Continue review locally; a local merge does not deploy to Render. GitHub push is a separate action.
 
-## 2. Rollback points
-- `.rollback-QUEST4.0/` — frozen single-device game (restore by copying over the project root). Notes: `QUEST-4.0-NOTES.md`.
-- `.rollback-QUEST3.3/`, `V3.01-NOTES.md` — older.
-- `QUEST\QUEST` nested copy: untouched legacy, ignore.
-Nothing multiplayer-related exists in the 4.0 rollback.
+## Agreed Episode 01 rules
 
-## 3. Game rules (unchanged by multiplayer work)
-- Five skills: Read, Listen, Speak, Write, Quiz. Heading text is "SKILLS FOR THE ROAD".
-- 50-question bank (`src/core/challengeBank.js`); each player gets an independent 15-question deck (3 per skill, disjoint). `buildDecks` accepts a seed (`src/core/deck.js`).
-- Quiz = reveal question: reveal, then CORRECT / WRONG. A failed Quiz retries with a *different unseen* question from the 20 bank questions in neither deck (retry may be any skill). State: `override[player]`, `seenQuizzes` in `gameState.js`; `currentChallenge` honours `game.override`. Failed Reading/Speaking/Writing/Listening repeat the same question.
-- Writing scoring by word count: 0 words none; 1–10 RETRY; 11..minimum RETRY+FAIR; ≥minimum RETRY+FAIR+GOOD. GOOD 5 pts, FAIR 2, RETRY 0.
-- Pass → player advances to next stop; fail → stays (red ring) and waits for next turn. Position 15 = finished. *Open question: FAIR on Speaking/Writing currently advances; owner has not confirmed.*
-- Rings: both yellow at London; green after a correct answer and stays green while progressing; red on any fail/retry.
+### Clock, route and points
 
-## 4. Changes made since the 4.0 freeze (the multiplayer track)
-Goal (owner's spec): HOST creates a room and shares a link; guest opens it; both browsers play one shared game. Online players each choose only their own avatar/name; judge/owner split for peer-judged skills.
+- The timer is 50 minutes and continues counting during writing, listening, location videos, previews and movement. There is no pause capability.
+- Scores determine route positions. Each city checkpoint is five route points apart. London is the starting location; Istanbul is location 15, reached at 70 route points.
+- GOOD/correct earns up to 5; FAIR earns up to 2; RETRY earns 0. An award cannot carry a player past the next city checkpoint. For example, 2 followed by a 5-point answer becomes 5: only 3 points count on that second answer. Feedback must report the points actually applied.
+- Partial awards place the avatar between cities. The code maps position as score / 5, so 2 points currently means 40% of a leg. Only cities have locator dots and names. An exact halfway placement for 2 points is not implemented.
+- Players alternate turns. A player arriving at Istanbul waits their next turn to answer its final question; arrival alone does not finish the player.
+- Passing the final question awards 5 more points. The first finisher receives another 5-point bonus: winner 80, runner-up 75.
+- Retry scoring has no special 3-point cap: retries may earn 5, 2 or 0, subject to the normal next-checkpoint limit.
+- Two consecutive failures trigger regression by one route segment, deducting up to 5 points, bounded at zero. A failed Quiz is followed by a skill retry; a further failure contributes to the setback sequence. No regression beyond London.
 
-### Phase 1 — lobby, link, join (DONE, tested)
-- First page shows HOST / SOLO over the live mountain video. HOST creates a room, copies the invite link, shows "WAITING FOR OTHER PLAYER" (+ COPY LINK, CANCEL). Guest link `/?room=CODE` shows ENTER THE QUEST. Joining = the join event; both advance to the Proclamation. A third visitor sees "room full".
-- `scripts/rooms.mjs`: in-memory room store (`createRoomStore`), HTTP handler (`createRoomHandler`). Seats: `student` = host = Player 1, `guide` = guest = Player 2. 4-char codes (no ambiguous letters), UUID tokens never exposed in snapshots, 6-hour TTL prune, max-rooms cap.
-  - Routes: `POST /api/rooms`, `GET /api/rooms/:code`, `POST …/join`, `GET …/events?token=` (SSE), `POST …/profile`, `POST …/ready`. Route regex needs exactly 4 alphanumerics.
-- `src/core/multiplayer.js`: client helpers (`roomCodeFromUrl`, `inviteLink`, `createRoom`, `joinRoom`, `roomStatus`, `connectRoom` via EventSource, `sendProfile`, `sendReady`, `copyText`, session in sessionStorage key `quest-room`).
-- UI: `lobbyControls` in `src/screens/opening/Splash.js`; CSS appended at end of `src/styles.css`.
-- `scripts/dev.mjs` calls `handleRooms` before static serving.
-- Transport choice: SSE + POST (no WebSocket dependency; works through proxies/tunnels).
+### Questions and Quiz rewards
 
-### Phase 2 — shared traveller setup + ready gate (DONE, browser-verified with two tabs)
-- Snapshot carries `phase` (`lobby` → `opening` → `playing`), `seed`, and per seat `joined/name/avatar/ready`.
-- Server: `setProfile` (avatar must match `/^\/assets\/…/`; `taken` if other seat has it; `locked` once ready/playing; name trimmed to 24), `setReady` (both ready → `phase='playing'`, `seed=crypto.randomInt`).
-- Setup screen online (`TravellerSetup.js`, `PlayerCard.js`): only your own editable card ("· YOU"); the other seat is a read-only live card (`#other-seat`, "CHOOSING…"/"READY ✓"); avatars taken by the other player are disabled/greyed. Updates patch DOM in place (no re-render) so the name input keeps focus.
-- Briefing (`Briefing.js` `playButton`): solo → `episode-start`; online → `episode-ready`, then disabled "WAITING FOR <NAME>…". When both ready, both clients call `startEpisode(seed)` → identical decks.
-- `App.js` online state: `net = {seat, meReady, otherReady}`; `onRoomUpdate`, `shareProfile`, `startEpisode`, `restoreRoom` (does not re-share profile), actions `host-room`, `join-room`, `cancel-room`, `copy-link`, `episode-ready`. Name `change` handler syncs your name (render deferred with `setTimeout` to avoid a blur/re-render DOM error).
-- Bugs fixed on the way: stale dev server returned 404 for the room API (restart after changing `rooms.mjs`); `post()` in `multiplayer.js` had a duplicate `body` declaration (renamed to `data`).
+- Each player has an independent seeded question schedule. Players may have different skills and Quiz questions at the same city.
+- Initial decks contain 15 questions, three per skill: Reading, Listening, Speaking, Writing and Quiz. Additional non-Quiz questions support longer journeys caused by partial scores and setbacks.
+- There are only three scheduled Quizzes per player. Quizzes are excluded at London and Istanbul; scheduled Quiz slots are independently randomized within slots 2-14 and are not adjacent. Selection also prevents a Quiz from being presented at the final city.
+- Failing a Quiz consumes that opportunity. Its retry is a non-Quiz skill card, never another Quiz. The player earns no reward for the failed Quiz; any unused reward remains available for subsequent successful Quizzes. Revisiting a Quiz slot after a setback uses a skill replacement.
+- FREEZE, GO BACK and BOOST are each available at most once per player. Used or ineffective choices are disabled. Fewer successful Quizzes mean fewer reward selections.
+- FREEZE makes the opponent miss the next turn and changes no points.
+- GO BACK regresses the opponent to the previous city checkpoint and deducts the points needed to return there. On a full city step that is 5 points; a partial leg can lose fewer. Scores and route positions remain aligned.
+- BOOST when level or behind targets the opponent's score +5. It is bounded by the final route checkpoint and does not finish the final question. When already ahead, the agreed goal is one stop ahead from the current position; see the implementation gap below.
 
-### Other changes since 4.0 (before the multiplayer work, already in 4.0 unless noted)
-- HUD logo 24px; two synthesised soundtracks (`scripts/build-soundtracks.mjs` → `assets/audio/soundtrack-intro.wav`, `soundtrack-journey.wav`); `src/core/audio.js` WebAudio loops, `armAutoplay()` starts intro on page load, journey starts at PLAY EPISODE 01, journey pauses during Listening (`pauseGameplay`/`resumeGameplay`). `forest-ambience-fallback.wav` kept but unreferenced.
+### Skill interactions
 
+- Reading and Quiz use shuffled multiple-choice options, seeded so both online players see matching order. Answer colours communicate the outcome; global Correct/Wrong labels and the old Select an answer instruction have been removed.
+- Quiz cards arrange question/options on the left and an image on the right when available. Controls form a separate left-aligned row beneath both columns; image is vertically centered beside the question area.
+- Listening uses native inputs embedded in the sentence. Each blank accepts a word or phrase. All blanks must be correct for the 5-point award; individual blanks show their own colour. No partial credit.
+- LS01: platform 3/three, time ten twenty/10.20. LS02: 3/three, waterproof. LS03: fifteen/15, foot, six/6. LS04: ten/10, dining room. LS05: Paris, south-east/south east/southeast, Switzerland. Recorded scripts remain the source for audio.
+- Writing prompts target 20-30 words. Empty text enables no assessment; 1-9 words allow RETRY, 10-19 also allow FAIR, 20 or more also allow GOOD. The displayed upper range does not disable GOOD above 30.
+- Speaking and Writing are judged by the other player online. Writing is submitted before the judge chooses the verdict. The answerer's controls show the selected assessment but cannot judge their own work.
 
-### Phase 3 — synced gameplay with owner/judge roles (DONE, browser-verified with two tabs)
-Architecture: **action relay**, not server-owned state. Both browsers run the same reducer on the same room seed; each in-game action is sent via `POST /api/rooms/:code/act` and the server forwards it as an SSE `act` event to the *other* seat only (allow-list `GAME_ACTIONS` in `scripts/rooms.mjs`, `store.relay`). The sender applies locally, the receiver replays it via `dispatch(..., remote=true, extra)` in `App.js` (`onRemoteAct`, `SYNCED`, `JUDGE_ACTIONS`).
-- Owner = the active player's seat; judge = the other seat. Owner-only actions: `start-challenge`, `select-answer`, `check-reading`, `check-listening` (value sent), `submit-writing` (text sent), plus the unrelayed-to-self `writing` typing mirror (150 ms debounce). Judge-only: `reveal-quiz`, `judge-quiz`, `judge`. Anything from the wrong seat is ignored locally.
-- Speaking/Writing: owner's GOOD/FAIR/RETRY are always disabled (informational); judge's are active (Writing: only after the owner presses "SEND TO <JUDGE>", and only the verdicts allowed by word count). The chosen verdict is highlighted (`.btn.chosen`) and the owner sees "<Judge> scored you FAIR · +2 PTS".
-- Quiz: judge (waiting player) sees the question, "<Owner> is answering…", REVEAL ANSWER, then the answer and CORRECT/WRONG; owner (active player) sees only the question and then the CORRECT/WRONG result. Answer is never rendered on the owner screen.
-- Reading: owner has active options + CHECK ANSWER; judge sees the question/passage, disabled options mirroring the owner pick, "<Owner> is answering…" (no check button) and the CORRECT/WRONG feedback. Listening: owner has audio button, answer box and CHECK; judge sees only the question, "<Owner> is listening…" (no audio button, no input) and the feedback.
-- Determinism: `start-episode` stores `game.seed`; quiz-retry pick uses `seededRandom` (mulberry32 on seed + progress) so both sides choose the same replacement question. Removed `Math.random` from that path when a seed exists.
-- Role rendering: `Challenge.js` `role(game)` uses `game.net` (passed in by `screenMarkup` for challenge/result/report screens).
-- Known gaps: each browser runs its own 50:00 timer (small drift possible); a reload mid-game loses state (no state resync/reconnect); a dropped SSE event is not replayed; no judge nudge/timeout. Move/cinematic animations run locally on both sides from the same state.
-- Test notes: in Playwright, `context().pages()` order is [host, guest]; `find(p=>p!==page)` can return the wrong page. Added a relay test in `tests/rooms.test.js`.
-## 5. NOT built yet (continue here)
-(Phase 3 above is built with an action-relay design; the items below that remain are the gaps.) Original plan — server owns turn state and the 50:00 clock; each question has an *owner* (answering) and a *judge* (other player).
-- Quiz: judge sees question + answer + reveal; owner answers verbally (assume voice on an external call at first); judge presses CORRECT/WRONG. Answer is withheld from the owner's client.
-- Speaking: owner speaks; GOOD/FAIR/RETRY inactive for owner, active for judge; chosen verdict shows on owner's screen and points apply.
-- Writing: owner types; text mirrors live to judge; verdict stays locked until owner presses SUBMIT; verdict returned to owner.
-- Reading/Listening: owner answers and self-checks; judge just sees question + result.
-Phase 4/5: judge nudge at ~60 s (no auto-score), reconnect/pause on disconnect, rejoin after reload (gameplay state currently lost on reload; only room membership survives), hosting for a real second player (invite link is `127.0.0.1` — needs a hosted server or tunnel, e.g. Cloudflare tunnel / Render / Fly.io), optional WebRTC voice.
+## Map and presentation
 
-Other open items: movable question card request; small-viewport checks of Writing/Listening cards; full browser run to Istanbul and the report screen; confirm FAIR advances; owner must audition the soundtracks.
+- Player 1 has a deep orange dotted route (#e65100); Player 2 has a purple dotted route (#8000ff). Both wind between locator centers. Each route is drawn only to its own player's position and retracts with regression.
+- Player 1's avatar stays west of their route; Player 2's stays east. At London only, avatars align horizontally with a 14-unit gap from the locator ring. Later positions follow the route geometry and its side offset.
+- Avatar ring colour is independent of route colour: no coloured ring at the initial state, green for progression/Boost, red for retry/regression/punishment.
+- Card sequence: location video pushes up and then down; player preview pushes up, switches to question/Quiz, answered card pushes down completely; transparent feedback appears; movement completes; scores update; feedback disappears; next preview displays for two seconds; next question appears.
+- The feedback strip sits at bottom center and uses concise text, at most two lines. It does not overlap the departing question card or next preview.
+- Punished-player presentation happens first: camera shows the affected avatar and its red annotation, its regression if applicable, then its score update. Awarded-player movement and camera follow happen afterward, then the next turn.
+- Under-avatar text: GO BACK shows Player Y goes behind -Npts in red; FREEZE shows Player Y misses a turn 0pts in red; BOOST shows Player X goes ahead +5pts in green.
+- Transparent reward feedback: Player X sends Player Y back; Player X freezes Player Y; Player X goes ahead of Player Y.
+- Automatic setback feedback: Retry failed. Goes back 1 spot - Npts.
+- Camera, avatar and route drawing share the movement animation. Page transitions use subtle fades; in-game cards use vertical entrances/exits. Animation smoothness still needs human browser review on the affected route segments.
+- HUD progress follows route position and changes to 15/15 once the final question is completed. It is not an independently counted tally of all attempted questions.
 
-## 6. File map
-- `src/App.js` — central controller: render, dispatch, lobby/room wiring (~175–290), `screenMarkup`, event listeners.
-- `src/core/` — `gameState.js` (turn engine/reducer), `deck.js`, `challengeBank.js`, `challengeSelect.js`, `listeningEngine.js`, `audio.js`, `multiplayer.js`, `router.js`, `storage.js`.
-- `src/components/` — `GameMap.js`, `HUD.js`, `PlayerCard.js`, `Navigation.js`, atmosphere components.
-- `src/screens/opening/` — `Splash.js`, `Proclamation.js`, `Skills.js`, `TravellerSetup.js`; `src/screens/episodes/Episode01/` (`Briefing.js` etc.).
-- `scripts/` — `dev.mjs`, `rooms.mjs`, `build-soundtracks.mjs`, `build-episode01-bank.mjs`, listening-audio generators.
-- `tests/` — `architecture`, `deck`, `game`, `listening`, `rooms` (rooms: 5 tests incl. profile/ready).
-- `src/data/episodes/episode01Challenges.js` — old placeholder, still imported.
+## Finish and timeout
 
-## 7. Environment gotchas (Windows / PowerShell 5)
-- Use `npm.cmd`; `Stop-Process -Id <n>` only; `Start-Process` has no `-Environment` (set `$env:PORT` first).
-- Some files are CRLF → multi-line edit matches can fail; use single-line anchors.
-- Write non-ASCII via `[IO.File]` with `UTF8Encoding($false)`.
-- The architecture test asserts the literal string `fadeAmbient(1200).then(()=>startGameplay())` in `App.js` (kept inside `startEpisode`).
-- Dev server must be restarted after editing `scripts/rooms.mjs`. A background server may already hold port 5173 (stop by PID).
-- Playwright: use `page.evaluate(()=>el.click())` for animated buttons; second player = another tab via `context().newPage()` or a second `openBrowserPage` with `?room=CODE`.
+- First finisher: large black-and-white checkered winner banner, name/avatar, celebration sound and confetti. The other player then continues alone.
+- Runner-up: quieter checkered banner, well done, no sound or confetti. Both completed players lead to the completion report.
+- Completion: centered report box over the Hagia Sophia/Istanbul video, QUEST COMPLETE, The road remembers, agreed journey text, winner and runner-up, VIEW ROAD AHEAD and REPLAY EPISODE 01.
+- Timeout before both complete currently displays TIME UP and QUEST FAILED. Text: The timer expired before both players got to the final stop. Scores are stacked vertically, highest first; ties put host first. No ahead/trailing labels. PLAY AGAIN is active; VIEW EPISODE 02 is disabled.
+- Completion reports currently show points. The requested replacement with each player's recorded finish time is pending, including deciding whether to label elapsed time or time remaining. It is not yet implemented or stored.
 
+## Location media
 
-### Role-view refinements (latest, user-approved spec)
-Final per-skill views are implemented in Challenge.js (ole(game) -> online/owner/judge) and gated in App.js dispatch (JUDGE_ACTIONS = reveal-quiz, judge-quiz, judge). Speaking: judge sees active GOOD/FAIR/RETRY + <Owner> is answering…; owner's buttons inactive, only the chosen one highlighted. Writing: as above. Not yet re-verified in two live tabs after the last refinement (56 unit tests pass, module loads); next agent should run a two-tab pass for Quiz/Reading/Listening/Speaking from both seats.
+- London introduction is implemented using George Morina's Tower Bridge clip. Fact: Tower Bridge opened on 30 June 1894. It appears before the first player preview.
+- Manchester introduction is implemented with Anas Alfakhuri's traffic clip when the city is first reached. It uses a descriptive caption rather than the proposed historic-building fact.
+- The owner selected Manchester Town Hall for the replacement. An approved downloadable video has not been supplied; embedding YouTube or obtaining the creator's reusable file were discussed but neither has been implemented.
+- The rejected Nottingham Station clip is archived at assets/locations/legacy/nottingham-station-rejected-for-manchester.mp4. It is not referenced by the game.
+- Credits and source links are retained in assets/locations/SOURCES.md, without displaying them on the location card. The city introduction currently supports London and Manchester only; remaining cities await footage and facts.
 
-### Game-rule additions ("spice") — latest
-- **Central quiz bank (66 tests):** the Quiz lane now draws from `src/data/quizBank.js` (30 general-knowledge items QZ01–QZ30, 4 options each, correct answer first, shuffled per game by `shuffledChallenge`). It is separate from the episode banks, so any episode can pull from it (`bankIds.Quiz` in challengeBank.js). The old Europe quiz is archived in `src/data/legacy/europeQuizBank.js` (written by scripts/build-episode01-bank.mjs, which no longer emits a quizBank). Each game uses 6 of the 30 (3 per player).
-- **Quiz is now multiple choice, auto-checked** (`quizBank` items have `options` + `correct` index; QZ04 = Istanbul, QZ07 = Rome). It reuses the Reading card (`readingCard` with `isQuiz`) and `select-answer`/`check-reading`. The old `reveal-quiz` / `judge-quiz` actions and the waiting-player quiz judging were removed.
-- **Quiz punishment:** on a correct Quiz the owner picks FREEZE (victim skips next turn) / BACK 1 (victim one stop back) / STEAL (up to 5 PTS moves to owner). Options only enabled if they would have an effect (`punishOptions` in `gameState.js`). New synced action `quiz-punish` (owner-only; added to the `GAME_ACTIONS` allow-list in `scripts/rooms.mjs` — restart the dev server after changes). Waiting player sees "<Owner> is choosing how to punish <Victim>…".
-- **Fail twice → one stop back:** `game.fails[player] = {stop,count}` in `completePlayerTurn`; two consecutive fails on the same stop (non-Quiz only; Quiz fails never count) move the player back one stop. Not applied at London (position 0).
-- **Winner bonus:** first player to reach stop 15 gets +10 (`WINNER_BONUS`, `game.winner`).
-- **Frozen:** `game.frozen[player]`; the frozen player's next turn is skipped, the other plays again.
-- `game.notice` (text of what just happened) is shown on the between-turn player-preview card (`.player-preview-notice`) on both screens, and keeps the preview up for ~3.8 s.
-- Verified: unit tests for all rules; live two-tab check of Quiz → punish → freeze. Back/steal/fail-drop/winner bonus are unit-tested but not yet exercised in a live two-tab run.
+## Episode previews
 
-### Quiz revision (latest, 63 tests)
-- **Quiz stops are random per game:** `buildDecks` (deck.js) now returns `{student, guide, quizStops}`. 3 Quiz stops, deck indices 1–13 (stops 2–14, never stop 1 or 15, never adjacent), the same for both players, picked from the room seed (`pickQuizStops`). All other stops hold Reading/Speaking/Writing/Listening (3 each, no same-skill back-to-back).
-- **Sent back onto a Quiz stop** (fail-twice drop or BACK punishment) → the player gets a skill question there (`skillReplacement`, stored in `game.override`), never a Quiz, so no Quiz rewards on a replay.
-- **Rewards after a correct Quiz** (3 types, no steal): reeze (victim skips a turn), ack (victim -1 stop and -2 PTS, BACK_PENALTY), oost (owner's score = max(own, opponent)+5, stop = max(own, opponent)+1, at most 2 beyond owner's new stop, cap stop 14; only offered if opponent is level/ahead in stop or score). **Each reward is once per player per game** (game.rewardsUsed = {student:[],guide:[]}); spent ones show greyed with 'used'. Rewards that would have no effect (back at London, freeze/back/boost vs a finished opponent, boost when ahead) are greyed but stay banked. A failed Quiz earns no reward. punishOptions(game) returns the usable ones. All applied immediately in completePlayerTurn.
-- **Route on setback:** legs drawn = furthest current position of either player; when the furthest player is sent back, that leg un-draws (.undrawing, 2 s). game.reached only keeps the route visible. Animation elapsed is clamped >= 0 (a negative rAF delta once crashed the move animation).
-- **Answer variety / shuffle (66 tests):** Listening compares canonical tokens (`canonicalTokens` in listeningEngine.js): digits = number words, min/mins/minute(s) and hr/hour(s) unify, "9mins" splits, and a unit word is optional and not counted against the word limit. Reading and Quiz options are shuffled per game by `shuffledChallenge` (challengeSelect.js, seeded by `game.optionSeed` + question id, so both browsers match and a replayed question keeps its order); `currentChallenge` returns the shuffled copy. The raw bank is unchanged (Reading was 8/10 option B).
-- **Retry rules (64 tests):** a retry of a stop already failed once (`isCappedRetry`, derived from `game.fails`, not Quiz) caps points at `RETRY_CAP` = 3 for all four skills (FAIR 2 stays 2); a second fail drops one stop (not at London), and the counter, retry chip and reason reset at the new stop. Speaking/Writing: the judge's RETRY first opens a reason picker (TOO SHORT / OFF TOPIC / UNCLEAR, local `game.reasonPick`, ← cancels via `judge-back`); the reason is sent as `judge` with `RETRY:<CODE>` (synced), saved in `game.retryReason[player]` and shown on the question chip ("RETRY · TOO SHORT · MAX 3 PTS") until the player replays it. Reading/Listening show "RETRY · MAX 3 PTS" with no reason.
-- **Setback animation:** `game.backAnim {player,from,to}`; `runBackAnimation` in App.js walks the pin back along its last leg (2 s). `game.reached` keeps the route drawn after someone moves back.
-- **Views:** Quiz waiting player sees only the question, disabled options with the owner's pick, and, after the owner chooses, "X chose: <reward>" (also shown to the owner). No reveal / Correct-Wrong buttons.
-## QUEST 5.0 frozen (2026-10-10)
-Rollback copy in .rollback-QUEST5.0/ (notes: QUEST-5.0-NOTES.md). 66 tests pass at freeze.
+All previews use one yellow dashed route through city locators; player routes, scores and timer are not shown on an unstarted episode preview. Tabs list all five episodes:
 
-## Quiz pictures
-- 11 of 30 quiz questions (QZ02, 06, 07, 12, 14, 18, 20, 22, 25, 27, 29) show a Wikimedia Commons photo banner above the question (image field in src/data/quizBank.js, PICTURES set). Credits: assets/quiz/CREDITS.md. Rejected/poor fits archived in assets/quiz/_rejected/. Other questions render as before.
+1. THE WEST: EUROPE
+2. THE ROAD TO THE EAST
+3. ACROSS THE PACIFIC
+4. THE AMERICAN CROSSING
+5. THE SANDS OF AFRICA
 
-## QUEST 6.0 frozen
-- Snapshot in .rollback-QUEST6.0/ (see QUEST-6.0-NOTES.md).
+Europe's briefing and preview use the shared route overlay on the Europe base map. Asia uses the supplied Asia base map with a Mercator projection and 15 numbered cities:
+
+Istanbul -> Damascus -> Baghdad -> Tehran -> Kabul -> Islamabad -> New Delhi -> Kathmandu -> Dhaka -> Bangkok -> Hanoi -> Hong Kong -> Taipei -> Shanghai -> Beijing.
+
+Episodes 03-05 show pending-map presentations until their final maps/routes are supplied. Their gameplay is not implemented.
+
+## Multiplayer architecture and limitations
+
+- HOST creates a room; guest joins through an invite link. SOLO supports two players on one device. Each online player chooses their own name/avatar and both ready before play.
+- Server uses SSE for updates and POST for actions. Both clients run the same seeded reducer; game actions are relayed to the other player.
+- Active player owns answer entry/reward selection; the waiting player judges Speaking and Writing. Listening blank answers and writing text are synchronized.
+- Rooms are in memory with a six-hour TTL. Room membership persists in sessionStorage, but authoritative gameplay recovery after reload/disconnection is not implemented.
+- Timers currently run independently per browser and may drift. Dropped events are not replayed; server-owned clock/state, reconnect/state recovery and judge nudges remain future work.
+
+## Question-bank governance for the future refactor
+
+Create src/data/questionbank/reading, listening, writing and speaking. Each skill has level1 through level5 collections (the proposed level1reading etc. naming can be applied during that refactor). Archive replaced files under legacy.
+
+Each item needs a stable ID, skill/type, level and skill-specific answer/evaluation data. Internal tags support selection and balancing and must not appear in the UI. Both players must receive comparable difficulty and skill counts, with independently randomized order and deterministic seeds for online replay. Episode 01 uses mostly Level 1; subsequent episodes progress through the levels. Preserve three Quizzes per player. These new banks and five-level contents do not exist yet; only the central Quiz bank and current Listening/episode banks exist.
+
+## Remaining review and implementation work
+
+- Finish-time display and storage on the successful report, replacing score display as requested.
+- Ahead-player BOOST currently adds the normal question award and then another five. That can move an already-ahead player two city steps on a full award; reconcile with the agreed one-step rule before treating that case as finalized.
+- GO BACK from a partial leg returns to a checkpoint, whereas automatic failed retry subtracts five route points. Keep that distinction visible; the owner's later fixed -5 annotation does not describe every partial Quiz setback.
+- Decide whether the 2-point position should remain proportional at 40% or be displayed at the exact midpoint.
+- Confirm whether timeout after one player has already finished should remain QUEST FAILED; current code fails unless both are complete.
+- Final Town Hall footage and fact; introductions for the remaining locations.
+- Central five-level question banks, later episode content and final maps.
+- Browser review of route/camera smoothness, movement order, complete two-player journey, small screens and media transitions after merging.
+- Online recovery and clock synchronization as described above.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDecks } from '../src/core/deck.js';
 import { bankIds, challengeById, checkQuizAnswer, checkReadingAnswer, checkWritingLength, writingVerdicts } from '../src/core/challengeBank.js';
-import { createInitialGame, reduceAction, completePlayerTurn, punishOptions } from '../src/core/gameState.js';
+import { createInitialGame, reduceAction, completePlayerTurn, punishOptions, scoreAfterAward, WINNER_BONUS } from '../src/core/gameState.js';
 import { currentChallenge } from '../src/core/challengeSelect.js';
 import { journey } from '../src/data/episodes/episode01.js';
 
@@ -17,8 +17,8 @@ test('writing verdicts unlock by word count', () => {
   assert.deepEqual(writingVerdicts(item, words(31)), ['RETRY', 'FAIR', 'GOOD']);
 });
 
-test('new games start with a 60-minute episode clock', () => {
-  assert.equal(createInitialGame().timerSeconds, 3600);
+test('new games start with a 50-minute episode clock', () => {
+  assert.equal(createInitialGame().timerSeconds, 3000);
 });
 
 test('bank has 10 items per episode skill and a central quiz bank of 30 general-knowledge items', () => {
@@ -106,25 +106,19 @@ test('a failed non-quiz challenge keeps the same question, marks RETRY, and the 
   assert.equal(currentChallenge(back).id, game.decks.student[idx]);
 });
 
-test('a failed quiz retries with a different, unseen question that is not in either deck', () => {
-  const base = reduceAction(createInitialGame(), { type: 'start-episode', episodeId: 1, seed: 5 });
+test('a failed Quiz is consumed and its retry uses a non-Quiz question', () => {
+  const base = startedGame();
   const idx = base.decks.student.findIndex(id => challengeById(id).lane === 'Quiz');
-  const quizId = base.decks.student[idx];
-  let game = { ...base, players: { ...base.players, student: { ...base.players.student, challengeIndex: idx } } };
-  const inDecks = new Set([...base.decks.student, ...base.decks.guide]);
-  const seen = new Set([quizId]);
-  for (let i = 0; i < 4; i++) {
-    game = completePlayerTurn(game, 0);
-    game = completePlayerTurn({ ...game, activePlayer: 'guide' }, 0);
-    game = { ...game, activePlayer: 'student' };
-    const next = currentChallenge(game);
-    assert.ok(!inDecks.has(next.id) && !seen.has(next.id));
-    if (next.lane !== 'Quiz') break;
-    seen.add(next.id);
-  }
-  const ok = completePlayerTurn(game, 5);
-  assert.equal(ok.override.student, null);
-  assert.equal(currentChallenge({ ...ok, activePlayer: 'student' }).id, base.decks.student[idx + 1]);
+  const game = atPositions(base, idx, 0);
+  const failed = completePlayerTurn(game, 0);
+  const retry = currentChallenge({ ...failed, activePlayer: 'student' });
+  assert.notEqual(retry.lane, 'Quiz');
+  assert.notEqual(retry.id, base.decks.student[idx]);
+  assert.equal(failed.rewardsUsed.student.length, 0);
+  assert.equal(failed.fails.student.count, 1);
+  const successfulRetry = completePlayerTurn({ ...failed, activePlayer: 'student' }, 5);
+  assert.equal(successfulRetry.override.student, null);
+  assert.equal(successfulRetry.players.student.challengeIndex, idx + 1);
 });
 
 test('the first finisher and runner-up celebrate before the completion report', () => {
@@ -180,14 +174,14 @@ test('failing the same stop twice sends the player one stop back, except at Lond
   assert.equal(london.players.student.position, 0);
 });
 
-test('an automatic setback moves to the previous city checkpoint and aligns the score', () => {
+test('an automatic setback deducts five points and moves one route segment back', () => {
   const base = startedGame();
   const idx = Math.max(1, firstNonQuizAt(base, 'student'));
   let game = { ...atPositions(base, idx, 0, { student: 8, guide: 0 }), earnedByStop: { student: { [idx]: 5 }, guide: {} } };
   game = completePlayerTurn(game, 0);
   const back = completePlayerTurn({ ...game, activePlayer: 'student' }, 0);
-  assert.equal(back.players.student.position, 1);
-  assert.equal(back.scores.student, 5);
+  assert.equal(back.players.student.position, 0.6);
+  assert.equal(back.scores.student, 3);
   assert.equal(back.earnedByStop.student[idx], 0);
 });
 
@@ -251,14 +245,18 @@ test('a failed Quiz never counts toward the two-fail drop', () => {
   }
 });
 
-test('the first player to finish stop 14 gets +10 once', () => {
+test('finishing awards five points and the first finisher gets a further five-point bonus', () => {
   const base = startedGame();
   const first = completePlayerTurn(atPositions(base, 14, 3, { student: 70, guide: 15 }), 5);
   assert.equal(first.winner, 'student');
-  assert.equal(first.scores.student, 80);
+  assert.equal(WINNER_BONUS, 5);
+  assert.equal(first.scores.student, 70 + 5 + WINNER_BONUS);
+  assert.equal(first.players.student.position, 14);
   const second = completePlayerTurn({ ...first, activePlayer: 'guide', scores: { ...first.scores, guide: 70 }, players: { ...first.players, guide: { ...first.players.guide, challengeIndex: 14, position: 14 } } }, 5);
-  assert.equal(second.scores.guide, 70);
+  assert.equal(second.scores.guide, 75);
   assert.equal(second.winner, 'student');
+  assert.equal(second.players.guide.position, 14);
+  assert.equal(scoreAfterAward(second.scores.guide, 0), 75);
 });
 
 test('each player gets 3 independently randomized Quiz stops and distinct questions', () => {
@@ -293,7 +291,7 @@ test('Quiz rewards: only unspent, effective ones are offered; each is once per p
   const spent = { ...atPositions(base, 2, 4, { student: 0, guide: 0 }), rewardsUsed: { student: ['freeze'], guide: [] } };
   assert.deepEqual(punishOptions(spent), ['boost']);
   assert.deepEqual(punishOptions({ ...spent, activePlayer: 'guide' }), ['freeze', 'boost']);
-  assert.deepEqual(punishOptions(atPositions(base, 2, 15)), []);
+  assert.deepEqual(punishOptions({ ...atPositions(base, 2, 15), completedPlayers: { student: false, guide: true } }), []);
 });
 
 test('Quiz Go Back moves the opponent to the previous city checkpoint with aligned score', () => {
@@ -385,6 +383,60 @@ test('Quiz Go Back moves one city checkpoint back and updates score to match', (
   assert.deepEqual(back.backAnim, { player: 'guide', from: 2.4, to: 2 });
 });
 
+test('a failed Quiz opponent is sent back before the Quiz winner score is shown', () => {
+  const base = startedGame();
+  const quizIndex = base.decks.student.findIndex(id => challengeById(id).lane === 'Quiz');
+  const beforeFailure = atPositions(base, quizIndex, 4, { student: quizIndex * 5, guide: 20 });
+  const failed = { ...completePlayerTurn(beforeFailure, 0), displayScores: beforeFailure.scores };
+  assert.equal(failed.players.student.position, quizIndex);
+  assert.equal(failed.activePlayer, 'guide');
+
+  const result = completePlayerTurn({
+    ...failed,
+    punish: { type: 'back', by: 'guide' }
+  }, 5);
+
+  assert.equal(result.players.student.position, quizIndex - 1);
+  assert.deepEqual(result.backAnim, { player: 'student', from: quizIndex, to: quizIndex - 1 });
+  assert.deepEqual(result.scoreAfterBack, { student: (quizIndex - 1) * 5, guide: 20 });
+  assert.deepEqual(result.rewardEffect, { playerId: 'student', type: 'back', pointsLost: 5 });
+  assert.deepEqual(result.displayScores, failed.displayScores);
+});
+
+test('the GO BACK amount is rendered beneath the affected avatar during its movement', async () => {
+  const { mapSvg } = await import('../src/components/GameMap.js');
+  const base = startedGame();
+  const map = mapSvg({}, {
+    ...base,
+    routeVisible: true,
+    backAnim: { player: 'student', from: 3, to: 2 },
+    rewardEffect: { playerId: 'student', type: 'back', pointsLost: 5 }
+  });
+  assert.match(map, /class="pin-effect-label back" y="28"[^>]*>Player 1 goes behind -5pts<\/text>/);
+  assert.match(map, /player-pin student ring-red/);
+});
+
+test('Freeze and Boost show reward messages and matching rings beneath the affected avatar', async () => {
+  const { mapSvg } = await import('../src/components/GameMap.js');
+  const base = startedGame();
+  const frozen = mapSvg({}, {
+    ...base,
+    routeVisible: true,
+    rewardEffect: { playerId: 'guide', type: 'freeze', pointsLost: 0 }
+  });
+  assert.match(frozen, /player-pin guide ring-red/);
+  assert.match(frozen, /class="pin-effect-label freeze" y="28"[^>]*>Player 2 misses a turn 0pts<\/text>/);
+
+  const boosted = completePlayerTurn({
+    ...base,
+    routeVisible: true,
+    punish: { type: 'boost', by: 'student' }
+  }, 5);
+  const boostMap = mapSvg({}, { ...boosted, routeVisible: true });
+  assert.match(boostMap, /player-pin student ring-green/);
+  assert.match(boostMap, /class="pin-effect-label boost" y="28"[^>]*>Player 1 goes ahead \+5pts<\/text>/);
+});
+
 test('Quiz rewards apply at once and are spent: freeze, back, boost', () => {
   const base = startedGame();
   const pick = (type, g) => completePlayerTurn({ ...g, punish: { type, by: 'student' } }, 5);
@@ -400,10 +452,10 @@ test('Quiz rewards apply at once and are spent: freeze, back, boost', () => {
   assert.equal(back.activePlayer, 'guide');
   assert.deepEqual(back.rewardsUsed.student, ['back']);
   const boost = pick('boost', g);
-  assert.equal(boost.players.student.position, 4);
-  assert.equal(boost.scores.student, 20);
+  assert.equal(boost.players.student.position, 3.4);
+  assert.equal(boost.scores.student, 17);
   assert.deepEqual(boost.rewardsUsed.student, ['boost']);
-  assert.deepEqual(boost.moveAnim, { player: 'student', from: 0, to: 4 });
+  assert.deepEqual(boost.moveAnim, { player: 'student', from: 0, to: 3.4 });
   assert.equal(pick('boost', { ...g, rewardsUsed: { student: ['boost'], guide: [] } }).players.student.position, 1);
   const ahead = pick('boost', atPositions(base, 6, 2, { student: 20, guide: 10 }));
   assert.equal(ahead.players.student.position, 6);
@@ -430,8 +482,7 @@ test('resolved Quiz reward produces movement-slip feedback before the next previ
   assert.equal(result.playerPreview, true);
   assert.ok(result.moveAnim);
   assert.equal(result.movementFeedback.playerId, 'student');
-  assert.match(result.movementFeedback.message, /Player 1 earns 5 points/);
-  assert.match(result.movementFeedback.message, /Player 1 is now ahead with/);
+  assert.equal(result.movementFeedback.message, 'Player 1 goes ahead of Player 2');
 });
 
 test('a player sent back onto a Quiz stop gets a skill question there, not a Quiz', () => {
