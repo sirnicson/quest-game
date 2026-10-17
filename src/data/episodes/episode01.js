@@ -10,7 +10,7 @@ const episode01 = {
     { name: 'Ebeltoft, Denmark', x: 785, y: 159, travel: 'NORTH SEA CROSSING' },
     { name: 'Hamburg, Germany', x: 759, y: 261 },
     { name: 'Strasbourg, France', x: 671, y: 433 },
-    { name: 'Forest, Switzerland', x: 686, y: 461 },
+    { name: 'Forêt de la Robertsau, France', x: 686, y: 461 },
     { name: 'Interlaken, Switzerland', x: 666, y: 521 },
     { name: 'Chamonix, France', x: 628, y: 559 },
     { name: 'Dolomites, Italy', x: 818, y: 519 },

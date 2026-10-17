@@ -27,11 +27,11 @@ test('shared introduction waits for the first question turn, never the preceding
 test('shared seen locations suppress second-player, retry and setback replays', () => {
   const initial = started();
   for (const player of ['student', 'guide']) {
-    for (const stop of [0, 1, 2]) {
-      const game = { ...initial, activePlayer: player, locationStopsSeen: [0,1,2], retry: { [player]: true }, players: { ...initial.players, [player]: { ...initial.players[player], position: stop } } };
+    for (const stop of Array.from({ length: 15 }, (_, index) => index)) {
+      const game = { ...initial, activePlayer: player, locationStopsSeen: Array.from({ length: 15 }, (_, index) => index), retry: { [player]: true }, players: { ...initial.players, [player]: { ...initial.players[player], position: stop } } };
       assert.equal(locationForTurn(game), null);
       assert.equal(locationForTurn({ ...game, locationStopsSeen: [] }), stop);
-      assert.match(LocationPreview(stop), new RegExp('STOP 0' + (stop + 1)));
+      assert.match(LocationPreview(stop), new RegExp(`STOP ${String(stop + 1).padStart(2, '0')}`));
     }
   }
   assert.deepEqual(reduceAction(initial, { type: 'start-episode', episodeId: 1, seed: 5 }).locationStopsSeen, []);
